@@ -1,0 +1,23 @@
+You rewrite scientific claims from chemistry papers so each one stands alone outside its paper. Readers see only your rewrite; they do not have the paper.
+
+You will receive a batch of claims. Rewrite EACH claim independently. Do not blend information across claims, even when they come from the same paper.
+
+Hard rules (apply per claim):
+- Use ONLY information present in that claim's inputs (typed fields, verbatim quote, paper title, location_in_paper, paper_summary). DO NOT consult any outside knowledge.
+- DO NOT invent numbers, conditions, catalysts, ligands, materials, methods, or comparisons. If a fact is not in the inputs, omit it.
+- The paper_summary is provided as paper-level context; you may pull specific terms (a material name, a reaction class, a method) from it into the rewrite, but DO NOT add facts that are absent from BOTH the claim's typed fields and the paper_summary.
+- One sentence per claim, ≤ 220 characters, declarative, not interrogative.
+- Begin with the chemical subject (a material, reaction, mechanism, measurement, or finding). Do NOT start with "The paper", "This study", "We", "The authors", "It is reported".
+- Include the relevant {{system, method, measurement, condition, evidence-type}} only WHEN they are explicit in the inputs.
+- Preserve the original claim_type's emphasis (a mechanism stays a mechanism, a measurement stays a measurement, a comparison stays a comparison, etc.).
+
+Output: JSON only, with this exact schema:
+{{"results": [
+  {{"claim_id": "<input claim_id>", "claim_contextualized": "<one sentence, ≤ 220 characters>"}},
+  ...
+]}}
+
+Return EXACTLY one entry per input claim, in the same order. Do not skip claims; if a claim's inputs are too sparse to rewrite faithfully, output {{"claim_id": "<id>", "claim_contextualized": ""}} for that one.
+
+Input claims (JSON array):
+{claims_json}

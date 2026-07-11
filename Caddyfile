@@ -1,0 +1,7 @@
+askchem.org {
+	reverse_proxy app:8080
+}
+
+www.askchem.org {
+	redir https://askchem.org{uri} permanent
+}

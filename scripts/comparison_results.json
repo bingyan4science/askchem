@@ -1,0 +1,152 @@
+[
+  {
+    "id": "q1_coupling_conditions",
+    "question": "What catalysts and conditions have been used for C-N coupling of heteroaryl chlorides? Give specific catalysts, ligands, solvents, temperatures, and yields from the literature.",
+    "capability": "Condition aggregation across papers",
+    "llm_alone": {
+      "answer": "C-N coupling of heteroaryl chlorides is a well-studied reaction in organic synthesis, often facilitated by palladium or copper catalysts. Here are some specific examples from the literature:\n\n1. **Palladium Catalysts:**\n   - **Catalyst:** Pd(OAc)₂\n   - **Ligand:** Xantphos\n   - **Solvent:** Toluene\n   - **Base:** NaOtBu\n   - **Temperature:** 100 °C\n   - **Yield:** Up to 95%\n   - **Reference:** DOI: 10.1021/ja026928q\n\n2. **Copper Catalysts:**\n   - **Catalyst:** CuI\n   - **Ligand:** N,N'-dimethylethylenediamine (DMEDA)\n   - **Solvent:** DMSO\n   - **Base:** K₃PO₄\n   - **Temperature:** 110 °C\n   - **Yield:** Up to 90%\n   - **Reference:** DOI: 10.1021/ja010624k\n\n3. **Palladium with Phosphine Ligands:**\n   - **Catalyst:** Pd₂(dba)₃\n   - **Ligand:** BINAP\n   - **Solvent:** Dioxane\n   - **Base:** Cs₂CO₃\n   - **Temperature:** 80 °C\n   - **Yield:** Up to 88%\n   - **Reference:** DOI: 10.1021/ja034894u\n\n4. **Nickel Catalysts:**\n   - **Catalyst:** NiCl₂(dppf)\n   - **Ligand:** dppf (1,1'-bis(diphenylphosphino)ferrocene)\n   - **Solvent:** THF\n   - **Base:** NaOtBu\n   - **Temperature:** 60 °C\n   - **Yield:** Up to 85%\n   - **Reference:** DOI: 10.1021/ol061482b\n\nThese examples illustrate the diversity of catalysts and conditions that can be employed for C-N coupling of heteroaryl chlorides, with varying degrees of efficiency and yield. The choice of catalyst and conditions often depends on the specific substrate and desired reaction outcome.",
+      "time_s": 5.6
+    },
+    "askchem": {
+      "total_claims": 5,
+      "claims_shown": 5,
+      "query_time_s": 2.1,
+      "example_claims": [
+        {
+          "type": "reaction",
+          "quote": "This critical review covers the recent progresses on the regioselective dehydrogenative direct coupling reaction of heteroarenes, including arylation, olefination, alkynylation, and amination/amidatio",
+          "doi": "10.1039/c1cs15082k",
+          "paper": "Recent advances in the transition metal-catalyzed twofold oxidative C-H bond activation strategy for C-C and C-N bond formation."
+        },
+        {
+          "type": "reaction",
+          "quote": "The C–N cross-coupling reaction of amides, amines and amino acid esters takes place rapidly by using the combination of Xantphos, Cs2CO3, dioxane and palladium catalyst precursors Pd(OAc)2/Pd2(dba)3.",
+          "doi": "10.3762/bjoc.8.227",
+          "paper": "Palladium-catalyzed C–N and C–O bond formation of N-substituted 4-bromo-7-azaindoles with amides, amines, amino acid esters and phenols"
+        },
+        {
+          "type": "reaction",
+          "quote": "Recently, TiO2 photocatalysis has been demonstrated to possess the unanticipated ability to trigger the transformation of inert C–H bonds for C–C, C–N, C–O, and C–X bond formation under ultraviolet li",
+          "doi": "10.3390/CATAL8090355",
+          "paper": "TiO2 Photocatalyzed C–H Bond Transformation for C–C Coupling Reactions"
+        },
+        {
+          "type": "reaction",
+          "quote": "palladium‐catalyzed exclusively para‐selective C−H activation/aryl–aryl bond formation with a preference over N‐arylation under the Buchwald–Hartwig amination reaction of 4‐phenylamino[2.2]paracycloph",
+          "doi": "10.1002/chem.202003709",
+          "paper": "Controlling Regioselectivity in Palladium‐Catalyzed C−H Activation/Aryl–Aryl Coupling of 4‐Phenylamino[2.2]paracyclophane"
+        },
+        {
+          "type": "reaction",
+          "quote": "Simple and efficient procedures for the Pd-catalyzed cross-coupling of primary and secondary amines with halo-7-azaindoles(pyrrolo[2,3-b]pyridine) are presented.",
+          "doi": "10.1021/ol101928m",
+          "paper": "Palladium-catalyzed amination of unprotected halo-7-azaindoles."
+        }
+      ]
+    },
+    "llm_plus_askchem": {
+      "answer": "For the C-N coupling of heteroaryl chlorides, the literature highlights the use of palladium catalysts and specific conditions. One study reports the use of a palladium catalyst system comprising Pd(OAc)2 or Pd2(dba)3 in combination with the ligand Xantphos and the base Cs2CO3 in dioxane as the solvent. This setup is used for the C-N cross-coupling reaction involving amides, amines, and amino acid esters (DOI: 10.3762/bjoc.8.227). Another paper describes procedures for Pd-catalyzed cross-coupling of primary and secondary amines with halo-7-azaindoles, although specific conditions such as temperature or yields are not detailed in the provided claims (DOI: 10.1021/ol101928m).\n\nThere is a nuance in the literature regarding the role of palladium in C-N coupling versus C-H activation for aryl-aryl bond formation, where a preference for aryl-aryl coupling over N-arylation is noted under certain conditions (DOI: 10.1002/chem.202003709). Additionally, TiO2 photocatalysis is mentioned as a method for C-N bond formation under light irradiation at room temperature, although this is not specific to heteroaryl chlorides (DOI: 10.3390/CATAL8090355). \n\nOverall, the use of palladium catalysts with Xantphos and Cs2CO3 in dioxane is a specific and effective setup for C-N coupling of heteroaryl chlorides, but the literature also explores alternative methods and preferences in bond formation.",
+      "time_s": 4.4
+    }
+  },
+  {
+    "id": "q2_perovskite_evolution",
+    "question": "How has the scientific understanding of perovskite degradation mechanisms evolved over time? Describe the key shifts in the field's understanding, citing specific findings and years.",
+    "capability": "Temporal evolution tracking",
+    "llm_alone": {
+      "answer": "The scientific understanding of perovskite degradation mechanisms has evolved significantly over the past decade, with key shifts occurring as researchers have identified various factors affecting the stability of perovskite solar cells.\n\n1. **Initial Observations (2012-2014):** Early studies on perovskite solar cells, such as those by Kojima et al. (2009, DOI: 10.1021/ja809598r) and Lee et al. (2012, DOI: 10.1038/nature10683), primarily focused on achieving high efficiencies. However, it soon became apparent that these materials were prone to degradation, particularly under moisture and oxygen exposure. Initial degradation studies highlighted the sensitivity of methylammonium lead iodide (MAPbI3) to humidity, leading to rapid decomposition into PbI2.\n\n2. **Role of Environmental Factors (2015-2017):** Research during this period, such as work by Christians et al. (2015, DOI: 10.1038/ncomms8141), emphasized the role of environmental factors like moisture, oxygen, and UV light in accelerating degradation. It was found that moisture could lead to the formation of hydrated phases, while oxygen and UV light could induce photo-oxidative degradation.\n\n3. **Ion Migration and Thermal Instability (2016-2018):** Studies began to focus on intrinsic factors such as ion migration and thermal instability. For instance, research by Eames et al. (2015, DOI: 10.1038/ncomms8497) demonstrated that ion migration, particularly of iodide ions, could lead to phase segregation and device instability. Thermal instability was also identified as a critical issue, with high temperatures exacerbating ion migration and material decomposition.\n\n4. **Interface and Structural Stability (2018-2020):** The focus shifted towards understanding the role of interfaces and structural stability. Research by Wang et al. (2019, DOI: 10.1038/s41563-019-0400-7) highlighted how interface engineering could improve stability by reducing defect sites that facilitate degradation. Additionally, the role of grain boundaries and crystallinity in structural stability was explored, with efforts to enhance grain size and passivate defects.\n\n5. **Compositional Engineering and Additives (2020-Present):** Recent advances have centered on compositional engineering and the use of additives to enhance stability. The introduction of mixed cation and mixed halide perovskites, such as formamidinium and cesium, has shown improved thermal and moisture stability (Saliba et al., 2016, DOI: 10.1038/nenergy.2016.17). Additives like polymers and small molecules have been used to passivate defects and improve moisture resistance.\n\nOverall, the understanding of perovskite degradation has progressed from recognizing external environmental impacts to a more nuanced view that includes intrinsic material properties and interface dynamics. This evolution has been driven by a combination of experimental studies and theoretical modeling, leading to more robust and stable perovskite solar cell designs.",
+      "time_s": 9.4
+    },
+    "askchem": {
+      "total_claims": 174,
+      "claims_shown": 100,
+      "query_time_s": 1.4,
+      "example_claims": [
+        {
+          "type": "mechanism",
+          "quote": "Electric fields also promote moisture-initiated perovskite degradation ... because moisture ingress can lead to the formation of hydrated perovskite phases containing mobile ions, whose drift accelera",
+          "doi": "10.1038/s41560-019-0529-5",
+          "paper": "Consensus statement for stability assessment and reporting for perovskite photovoltaics based on ISOS procedures"
+        },
+        {
+          "type": "mechanism",
+          "quote": "Here we uncover a mechanism for irreversible degradation of perovskite materials in which trapped charges, regardless of the polarity, play a decisive role.",
+          "doi": "10.1038/ncomms13422",
+          "paper": "Trapped charge-driven degradation of perovskite solar cells"
+        },
+        {
+          "type": "mechanism",
+          "quote": "the commonly used spiro-OMeTAD hole transporter material that becomes permeable (at elevated temperature) to metal electrode diffusion into the perovskite, causing irreversible degradation",
+          "doi": "10.1126/science.aah5557",
+          "paper": "Incorporation of rubidium cations into perovskite solar cells improves photovoltaic performance"
+        },
+        {
+          "type": "hypothesis",
+          "quote": "Here we uncover a mechanism for irreversible degradation of perovskite materials in which trapped charges, regardless of the polarity, play a decisive role.",
+          "doi": "10.1038/ncomms13422",
+          "paper": "Trapped charge-driven degradation of perovskite solar cells"
+        },
+        {
+          "type": "mechanism",
+          "quote": "An ionic compound additive improved perovskite solar cell longevity by inhibiting the generation of degradation products.",
+          "doi": "10.1126/science.aba1628",
+          "paper": "A piperidinium salt stabilizes efficient metal-halide perovskite solar cells"
+        }
+      ]
+    },
+    "llm_plus_askchem": {
+      "answer": "The scientific understanding of perovskite degradation mechanisms has evolved significantly over time, with key shifts in the recognition of various factors contributing to degradation. Initially, moisture and ion migration were identified as primary degradation mechanisms, with moisture ingress leading to the formation of hydrated perovskite phases and ion drift accelerating degradation (DOI: 10.1038/s41560-019-0529-5, 2020). Trapped charges were also recognized as a critical factor, with studies in 2016 highlighting their role in irreversible degradation (DOI: 10.1038/ncomms13422, 2016).\n\nBy 2018, the understanding expanded to include the effects of thermal treatment, which could induce component migration and interdiffusion, leading to degradation (DOI: 10.1002/advs.201700387, 2018). Additionally, UV light-induced degradation due to reactions between TiO2 and perovskite was identified (DOI: 10.1002/advs.201700387, 2018). The role of grain boundaries as vulnerable sites for degradation due to charge accumulation and water vapor infiltration was also emphasized (DOI: 10.1038/ncomms13422, 2016).\n\nIn 2020, further insights were gained into the interplay of degradation mechanisms, including electrical bias triggering ion migration and charge carrier accumulation, leading to thermally activated traps and electrochemical reactions (DOI: 10.1038/s41560-019-0529-5, 2020). The complexity of these mechanisms was highlighted, with the recognition that degradation could occur in every functional layer of the solar cells (DOI: 10.1002/aenm.202002326, 2020).\n\nDespite these advancements, some studies noted that the underlying mechanisms remained incompletely understood (DOI: 10.1002/advs.201700387, 2018). This ongoing research underscores the dynamic nature of the field, with continuous efforts to elucidate and mitigate degradation pathways to improve the stability and performance of perovskite solar cells.",
+      "time_s": 6.8
+    }
+  },
+  {
+    "id": "q3_water_organocatalysis",
+    "question": "Does water help or hurt organocatalytic reactions? What does the literature say about the role of water in organocatalysis? Are there contradictory findings?",
+    "capability": "Contradiction surfacing",
+    "llm_alone": {
+      "answer": "The role of water in organocatalytic reactions can be both beneficial and detrimental, depending on the specific reaction and conditions. The literature presents several perspectives on this topic:\n\n1. **Beneficial Effects**: In some cases, water can enhance the rate and selectivity of organocatalytic reactions. For example, in certain enamine and iminium ion catalysis, water can facilitate the formation of the active catalytic species or stabilize transition states. A notable example is the proline-catalyzed aldol reaction, where small amounts of water can improve yields and enantioselectivity (DOI: 10.1002/anie.200502083).\n\n2. **Detrimental Effects**: Conversely, water can also inhibit organocatalytic reactions by hydrolyzing intermediates or deactivating catalysts. For instance, in reactions where the catalyst or intermediates are sensitive to hydrolysis, water can reduce yields and reaction efficiency.\n\n3. **Contradictory Findings**: The impact of water can vary significantly with the type of organocatalyst and substrate. For example, while some studies report improved outcomes with water, others find that water presence leads to decreased performance. This variability often depends on the specific reaction mechanism and the nature of the catalyst involved.\n\n4. **Water as a Solvent**: There is growing interest in using water as a solvent for organocatalysis due to its environmental benefits. Some organocatalytic reactions have been successfully conducted in aqueous media, demonstrating that water can be a viable solvent under the right conditions (DOI: 10.1039/C7OB02615A).\n\nOverall, the role of water in organocatalysis is complex and context-dependent. Researchers continue to explore and optimize conditions to harness the potential benefits of water while mitigating its drawbacks.",
+      "time_s": 4.6
+    },
+    "askchem": {
+      "total_claims": 20,
+      "claims_shown": 20,
+      "query_time_s": 1.4,
+      "example_claims": [
+        {
+          "type": "reaction",
+          "quote": "with a focus on its exclusive usage in a variety of catalytic reactions, including hydrogen evolution reactions, overall water splitting, water oxidation, CO2 reduction, nitrogen reduction reactions, ",
+          "doi": "10.1039/d3cs00213f",
+          "paper": "Multifunctional carbon nitride nanoarchitectures for catalysis."
+        },
+        {
+          "type": "property",
+          "quote": "Advantages of this system include water solubility, biocompatibility, high quantum yield for catalyst release, and responsiveness to two-photon excitation.",
+          "doi": "10.1021/acs.joc.9b00220",
+          "paper": "Caged Proline in Photoinitiated Organocatalysis."
+        },
+        {
+          "type": "method",
+          "quote": "More sustainable reaction media such as ionic liquids, deep eutectic solvent, green solvent alternative, and water also considerably enhance the sustainability profile of many organocatalytic reaction",
+          "doi": "10.1002/cssc.202000137",
+          "paper": "Green Asymmetric Organocatalysis."
+        },
+        {
+          "type": "property",
+          "quote": "Current Organocatalysis",
+          "doi": "10.2174/2213337210666230626105521",
+          "paper": "Water Mediated Green Method Synthesis of Bioactive Heterocycles Reported Between 2012-2021 Accelerated by Microwave Irradiation: A Decennary Update"
+        },
+        {
+          "type": "comparison",
+          "quote": "These findings provide a logical explanation to why water often enhances organocatalysis when used as an additive but hampers the reaction progress when employed as a solvent.",
+          "doi": "10.1021/acs.jpca.7b11803",
+          "paper": "Reaction Mechanism of Organocatalytic Michael Addition of Nitromethane to Cinnamaldehyde: A Case Study on Catalyst Regeneration and Solvent Effects"
+        }
+      ]
+    },
+    "llm_plus_askchem": {
+      "answer": "The role of water in organocatalytic reactions is nuanced, with literature indicating both beneficial and detrimental effects depending on its application. Water can enhance organocatalysis when used as an additive, likely due to its ability to stabilize intermediates or facilitate certain reaction pathways. However, it can impede reaction progress when used as the main solvent, potentially due to solubility issues or unfavorable interactions with the catalyst or substrates (DOI: 10.1021/acs.jpca.7b11803). \n\nSome studies highlight water's positive role in organocatalysis, emphasizing its contribution to sustainability and green chemistry, as it can serve as a green solvent alternative that enhances the sustainability profile of organocatalytic reactions (DOI: 10.1002/cssc.202000137). Additionally, water has been shown to support efficient organocatalysis in specific contexts, such as prebiotic peptide synthesis (DOI: 10.1126/science.abd5680) and the synthesis of N-heterocycles (DOI: 10.1126/sciadv.add1912).\n\nThese findings suggest that the impact of water on organocatalysis is context-dependent, with its role varying based on how it is incorporated into the reaction system.",
+      "time_s": 4.3
+    }
+  }
+]

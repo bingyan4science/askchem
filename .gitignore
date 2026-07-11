@@ -1,0 +1,66 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.eggs/
+
+# Databases (large — hosted on HuggingFace)
+*.db
+*.db-shm
+*.db-wal
+*.db.bak
+*.db.bak.*
+
+# Logs
+*.log
+logs/
+
+# Virtual environments
+.venv/
+.venv-*/
+venv/
+
+# Large binary artifacts (embeddings / indices / backups)
+*.npz
+*.faiss
+*.faiss.*
+*.bak
+*.bak.*
+
+# Living Taxonomy build outputs (large, regenerated)
+living_taxonomy/output/
+
+# Large data files
+data/claim_embeddings.npz
+data/reclassify_batches/
+
+# Data (large files — PDFs, index, backups)
+data/papers/
+data/papers_full/
+data/deep_pipeline/
+data/deep_results/
+data/classify_pipeline/
+data/classify_abstracts/
+data/paper_classify/
+data/corpus_checkpoints/
+data/*checkpoint*.json
+data/preprint_recovery.json
+data/surprise_scores.json
+data/metadata/
+chemtree_index/
+chemtree_index_backup_*/
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+*.swp
+*.swo
+
+# Test artifacts
+test_gemini.py
+
+# Environment
+.env
+*.env

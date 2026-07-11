@@ -1,0 +1,39 @@
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
+openai>=1.50.0
+requests>=2.31.0
+pydantic>=2.0.0
+rdkit>=2024.3.1
+programasweights>=0.1.0.dev6
+PyJWT[crypto]>=2.8.0
+
+# v2 retrieval stack (δ3 ship-to-prod, May 11). Required by
+# CHEMTREE_RETRIEVER_VERSION=v2 (chemtree.embeddings_v2 +
+# chemtree.cross_encoder_rerank). Pins are deliberately permissive
+# because both local dev and the VPS have these installed at newer
+# versions than the lower bounds and we don't want a fresh
+# `pip install -r requirements.txt` to silently downgrade them.
+#
+#   torch              — verified working at 2.5–2.11. Lower bound is
+#                        2.5 because that's the first release line
+#                        with stable mxbai forward pass on CPU; upper
+#                        bound is left open since 2.6/2.7/2.8/2.11 all
+#                        ship pre-built linux/amd64 + darwin/arm64
+#                        wheels we've tested against.
+#   transformers       — 4.45 first registered mxbai's CLS pooling
+#                        correctly via AutoModel; 5.x changes the
+#                        `AutoTokenizer` import surface but kept the
+#                        bits we use working.
+#   sentence-transformers — 3.x+ for the new SentenceTransformer
+#                        device kwargs.
+#   faiss-cpu          — 1.8+ adds the IO_FLAG_MMAP bit we toggle via
+#                        CHEMTREE_FAISS_MMAP.
+#   numpy              — 1.26+ (both 1.x and 2.x ABIs verified).
+#   huggingface_hub    — 0.24+ (both 0.x and 1.x verified; 1.x ships
+#                        the new `hf` CLI used by deploy_to_vps.sh).
+torch>=2.5
+transformers>=4.45
+sentence-transformers>=3.0
+faiss-cpu>=1.8
+numpy>=1.26
+huggingface_hub>=0.24

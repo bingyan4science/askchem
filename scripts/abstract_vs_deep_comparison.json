@@ -1,0 +1,116 @@
+[
+  {
+    "id": "q1_limitations",
+    "question": "What are the known limitations and failure modes of perovskite solar cells?",
+    "target_type": "What doesn't work (limitations)",
+    "abstract_claims": 40,
+    "abstract_claim_types": {
+      "computational_result": 3,
+      "property": 20,
+      "mechanism": 5,
+      "method": 3,
+      "comparison": 8,
+      "reaction": 1
+    },
+    "deep_claims": 40,
+    "deep_claim_types": {
+      "computational_result": 2,
+      "comparison": 12,
+      "property": 13,
+      "hypothesis": 1,
+      "method": 1,
+      "limitation": 3,
+      "mechanism": 3,
+      "future_direction": 2,
+      "experimental_design": 1,
+      "structure": 2
+    },
+    "answer_abstract": "Perovskite solar cells (PSCs) face several limitations and failure modes that hinder their commercial application. A critical restraining factor is their long-term stability, which remains a significant challenge despite achieving high power conversion efficiencies (PCEs) of up to 25.5% in single-junction structures [DOI: 10.1039/d0ta07495k]. Ionic migration is identified as a key mechanism contributing to detrimental behaviors in PSCs, affecting their stability and performance [DOI: 10.1002/adfm.201908920]. Additionally, while PSCs have surpassed the energy conversion efficiency of some commercial photovoltaic technologies, there is still a substantial gap between current efficiencies and the theoretical limit, indicating room for improvement [DOI: 10.1002/anie.202108800]. Future research directions include exploring carbon nanomaterials to address these issues [DOI: 10.1039/C5TA00873E].",
+    "answer_deep": "Perovskite solar cells (PSCs) face several limitations and failure modes. One significant limitation is the difficulty in perovskite deposition when combining mesoporous and capping layers, which, although potentially increasing efficiency and reducing hysteresis, complicates the fabrication process [DOI: 10.1002/advs.201700387]. Hysteresis in PSCs is another issue, with large variations in reported hysteresis time constants, leading to claims of \"hysteresis-free\" devices being questioned [DOI: 10.1021/acs.accounts.5b00431]. \n\nDegradation mechanisms are also a concern. For instance, silver electrodes in PSCs can react with halide ions in humid environments, forming silver halides and causing device degradation [DOI: 10.1002/advs.201700387]. Additionally, trapped charges at the TiO2 interface may initiate degradation [DOI: 10.1038/ncomms13422]. The deprotonation of organic cations by trapped charge-induced local electric fields is hypothesized to initiate irreversible decomposition [DOI: 10.1038/ncomms13422].\n\nFuture directions include computational predictions for lead replacement due to the variety of possible halide perovskites [DOI: 10.1039/C4EE00673A] and photon management strategies to minimize photonic losses [DOI: 10.1126/science.aaf1168]. These limitations and mechanisms highlight the complexity and challenges in improving the stability and efficiency of PSCs.",
+    "answer_both": "Perovskite solar cells (PSCs) face several known limitations and failure modes. One significant challenge is long-term stability, which remains a critical factor hindering their commercial application despite achieving high power conversion efficiencies (PCEs) in laboratory settings [DOI: 10.1039/d0ta07495k]. Ionic migration is identified as a crucial mechanism contributing to detrimental behaviors in PSCs, potentially affecting their performance and longevity [DOI: 10.1002/adfm.201908920]. Additionally, the integration of mesoporous and capping layers, while beneficial for efficiency and reducing hysteresis, complicates the perovskite deposition process, adding to the manufacturing challenges [DOI: 10.1002/advs.201700387]. These limitations highlight the need for further research to enhance the stability and manufacturability of PSCs for practical applications."
+  },
+  {
+    "id": "q2_surprising",
+    "question": "What surprising or unexpected findings have been reported in metal-organic framework research?",
+    "target_type": "Unexpected results (surprising_finding)",
+    "abstract_claims": 40,
+    "abstract_claim_types": {
+      "method": 9,
+      "property": 17,
+      "comparison": 5,
+      "computational_result": 3,
+      "mechanism": 5,
+      "reaction": 1
+    },
+    "deep_claims": 40,
+    "deep_claim_types": {
+      "mechanism": 3,
+      "property": 17,
+      "limitation": 4,
+      "surprising_finding": 1,
+      "comparison": 5,
+      "reaction": 2,
+      "computational_result": 2,
+      "method": 5,
+      "scope_entry": 1
+    },
+    "answer_abstract": "One surprising finding in metal-organic framework (MOF) research is the integration of the 1,3,6,8\u2010tetrakis(p\u2010benzoic acid)pyrene (H4TBAPy) linker into the shp topology for the first time, which represents a novel structural achievement in the field [DOI: 10.26434/chemrxiv.12355406]. Additionally, the synthesis of micron-sized ultrathin MOF sheets with thicknesses comparable to graphene is another unexpected advancement, potentially paving the way for new applications of two-dimensional MOF materials [DOI: 10.1021/jacs.0c04442]. These findings highlight the innovative directions and structural versatility being explored in MOF research.",
+    "answer_deep": "One surprising finding in metal-organic framework (MOF) research is that certain MOFs can meet new volumetric targets set by the Department of Energy (DOE) if the packing efficiency loss is ignored [DOI: 10.1039/c5cs00307e]. This suggests that despite potential inefficiencies in packing, MOFs can still achieve significant performance metrics, which may not have been anticipated given their structural characteristics.",
+    "answer_both": "A surprising finding in metal-organic framework (MOF) research is that certain MOFs can achieve volumetric targets set by the DOE, but this is contingent on ignoring packing efficiency loss (DOI: 10.1039/c5cs00307e). This suggests that while MOFs have the potential to meet high storage capacities, practical considerations such as packing efficiency must be addressed to fully realize their potential in applications."
+  },
+  {
+    "id": "q3_scope",
+    "question": "What substrate scope has been explored for covalent organic frameworks in CO2 capture?",
+    "target_type": "Substrate tables (scope_entry)",
+    "abstract_claims": 0,
+    "abstract_claim_types": {},
+    "deep_claims": 0,
+    "deep_claim_types": {},
+    "answer_abstract": "The provided claims do not contain specific information about the substrate scope explored for covalent organic frameworks in CO2 capture. To address this question effectively, details from relevant studies or reviews would be necessary, including the types of substrates tested, their efficiency, and any limitations or future directions suggested in the research. If you have access to specific claims or studies, please provide them for a more detailed synthesis.",
+    "answer_deep": "The provided claims do not include specific information about the substrate scope explored for covalent organic frameworks in CO2 capture. Without this data, I cannot synthesize a detailed answer. Please provide claims that detail the substrate scope or relevant studies.",
+    "answer_both": "I'm sorry, but there are no claims provided for me to synthesize an answer regarding the substrate scope explored for covalent organic frameworks in CO2 capture. Please provide specific claims or data for me to analyze."
+  },
+  {
+    "id": "q4_future",
+    "question": "What are the open problems and future research directions in electrolyte design for sodium-ion batteries?",
+    "target_type": "Open problems (future_direction)",
+    "abstract_claims": 1,
+    "abstract_claim_types": {
+      "method": 1
+    },
+    "deep_claims": 0,
+    "deep_claim_types": {},
+    "answer_abstract": "The paper with DOI: 10.3389/fchem.2023.1253959 discusses the basic requirements and classifications of organic liquid electrolytes for sodium-ion batteries, highlighting the current research status. However, it does not explicitly address open problems or future research directions in electrolyte design for these batteries. Further investigation into specific challenges and potential advancements in this area would be necessary to identify these aspects.",
+    "answer_deep": "I'm sorry, but there are no specific claims provided for me to synthesize an answer regarding the open problems and future research directions in electrolyte design for sodium-ion batteries. If you can provide claims or additional information, I would be able to help further.",
+    "answer_both": "The open problems and future research directions in electrolyte design for sodium-ion batteries, as discussed in the provided claim, involve addressing the basic requirements and classifications of organic liquid electrolytes. The current research status highlights the need for further exploration into optimizing these electrolytes to enhance the performance and safety of sodium-ion batteries. Future directions may include developing novel electrolyte formulations that can improve ionic conductivity and stability while minimizing side reactions. However, the claim does not specify particular challenges or detailed future research pathways, indicating a broad scope for exploration in this area. [DOI: 10.3389/fchem.2023.1253959]"
+  },
+  {
+    "id": "q5_hypothesis",
+    "question": "What hypotheses have been proposed about the structure and function of intrinsically disordered proteins?",
+    "target_type": "Hypotheses being tested",
+    "abstract_claims": 40,
+    "abstract_claim_types": {
+      "mechanism": 4,
+      "property": 14,
+      "method": 11,
+      "computational_result": 5,
+      "comparison": 6
+    },
+    "deep_claims": 40,
+    "deep_claim_types": {
+      "property": 10,
+      "structure": 1,
+      "mechanism": 10,
+      "limitation": 2,
+      "comparison": 8,
+      "computational_result": 3,
+      "conclusion": 3,
+      "surprising_finding": 1,
+      "future_direction": 1,
+      "method": 1
+    },
+    "answer_abstract": "Several hypotheses have been proposed regarding the structure and function of intrinsically disordered proteins (IDPs). One key hypothesis is that the lack of a fixed spatial structure in IDPs facilitates their regulatory functions and allows the efficiency of biochemical reactions to be controlled by temperature and the cellular environment [DOI: 10.1007/s00249-023-01683-8]. This structural plasticity enables IDPs to exploit a rich array of soft interactions and binding phenomena [DOI: 10.1016/j.sbi.2023.102756], allowing them to perform a wide range of biological functions, including transcription regulation [DOI: 10.1038/s41598-020-58868-w]. Additionally, IDPs can spontaneously fluctuate between numerous configurations in their native form [DOI: 10.1088/2399-1984/abfb7c], and their conformational space includes multiple metastable conformations for a given sequence [DOI: 10.26434/chemrxiv.12798125]. These features suggest that IDPs have a similar behavior to synthetic polymers and urea-denatured proteins [DOI: 10.1021/acs.analchem.8b05617]. However, high-resolution structural information about IDPs is generally lacking due to their physicochemical properties [DOI: 10.1016/j.bbrep.2023.101474]. Future research directions include improving computational methods for modeling IDPs, which currently suffer from limited transferability when modeling sequences and conformations absent in the training data [DOI: 10.1371/journal.pcbi.1012144].",
+    "answer_deep": "Hypotheses regarding the structure and function of intrinsically disordered proteins (IDPs) propose that these proteins and intrinsically disordered protein regions (IDPRs) are functional despite lacking unique structures and are prevalent across all organisms [DOI: 10.3389/fphy.2019.00010]. Their conformational plasticity allows them to interact with multiple partners and adapt to environmental changes, which is hypothesized to be due to their lack of ordered structure, making them resilient to harsh conditions [DOI: 10.3389/fphy.2019.00010]. Surprisingly, IDPs/IDPRs can form tight complexes without gaining ordered structures, retaining flexibility and dynamic characteristics [DOI: 10.3389/fphy.2019.00010]. The field is rapidly developing, and future research is expected to provide deeper insights into these proteins, which are still poorly understood despite their abundance and importance [DOI: 10.3389/fphy.2019.00010].",
+    "answer_both": "Hypotheses regarding the structure and function of intrinsically disordered proteins (IDPs) suggest that their lack of a fixed spatial structure allows them to perform regulatory functions efficiently, with their biochemical reactions being influenced by temperature and the cellular environment (DOI: 10.1007/s00249-023-01683-8). IDPs exploit their structural plasticity to engage in diverse soft interactions and binding phenomena (DOI: 10.1016/j.sbi.2023.102756), and their ability to interact with multiple partners is linked to their conformational plasticity and environmental sensitivity (DOI: 10.3389/fphy.2019.00010). Despite their functional importance, high-resolution structural data on IDPs is limited due to their physicochemical properties (DOI: 10.1016/j.bbrep.2023.101474). The field is rapidly evolving, making it challenging to provide a comprehensive overview (DOI: 10.3389/fphy.2019.00010)."
+  }
+]

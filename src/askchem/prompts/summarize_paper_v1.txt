@@ -1,0 +1,22 @@
+You write a short, factual paper-level summary of a chemistry paper using ONLY the list of claims that have already been extracted from it. The reader will use your summary as paper-level context when reading individual claims, and as a search field in the index.
+
+Hard rules:
+- Use ONLY information present in the input claims, paper title, and metadata. DO NOT consult outside knowledge.
+- DO NOT invent numbers, conditions, catalysts, ligands, materials, or methods. Omit anything you cannot ground in the inputs.
+- Output a single paragraph, ≤ 80 words, ≤ 6 sentences.
+- Mention the paper's main system (material/reaction/process), its main method or measurement, and its main finding(s) — but only if explicitly present in the claims.
+- Do NOT begin with "This paper", "The authors", "We", or "In this study".
+- Use specific chemistry vocabulary that appears in the claims (catalyst names, reaction classes, technique names, material classes), so the summary is searchable.
+
+Output: JSON only, with this exact schema:
+{{"doi": "<input doi>", "paper_summary": "<one paragraph, ≤ 80 words>"}}
+
+Inputs:
+doi:           {doi}
+paper_title:   {paper_title}
+venue:         {venue}
+year:          {year}
+n_claims:      {n_claims}
+
+claims_block:
+{claims_block}

@@ -1,0 +1,9 @@
+chemtree_index/
+data/
+experiments/
+structure_the_universe_paper/
+*.pyc
+__pycache__
+.git
+.gitmodules
+*.log
