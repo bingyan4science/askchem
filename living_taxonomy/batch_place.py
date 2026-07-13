@@ -17,7 +17,7 @@ Usage:
     python3 living_taxonomy/batch_place.py submit
     python3 living_taxonomy/batch_place.py poll
     python3 living_taxonomy/batch_place.py collect
-    python3 living_taxonomy/apply_to_db.py        # then load into chemtree.db
+    python3 living_taxonomy/apply_to_db.py        # then load into askchem.db
 """
 
 from __future__ import annotations
