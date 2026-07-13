@@ -31,7 +31,7 @@ import pilot_data
 import placement as pm
 from incremental_build import _parse_json
 
-DB = "file:" + str(_HERE.parent / "chemtree.db") + "?immutable=1"
+DB = "file:" + str(_HERE.parent / "askchem.db") + "?immutable=1"
 OUT = _HERE / "output" / "prompt_lab"
 
 # Diverse, telling sample (incl. cases that previously produced bad principles).
