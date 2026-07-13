@@ -1,4 +1,4 @@
-"""Read-only sampling of pilot papers/claims from chemtree.db.
+"""Read-only sampling of pilot papers/claims from askchem.db.
 
 Opens the production DB with ``immutable=1`` so the pilot can NEVER write
 to it. We pull a small focused set of papers (catalytic cross-coupling /
