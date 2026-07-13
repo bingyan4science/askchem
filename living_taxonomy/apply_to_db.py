@@ -1,4 +1,4 @@
-"""Load the grown living-taxonomy views into chemtree.db tables.
+"""Load the grown living-taxonomy views into askchem.db tables.
 
 Reads ``output/grown_views.json`` (produced by grow_onto_scaffold.py) and writes
 into ``taxonomy_nodes`` / ``taxonomy_edges`` / ``taxonomy_leaves`` / ``taxonomy_meta``
@@ -9,7 +9,7 @@ Internal-node ids are the normalized concept name (shared across views, so the
 trunk is deduped); the view root is ``__root__``; leaves reference claim_id.
 
 Usage:
-    python3 living_taxonomy/apply_to_db.py [--db chemtree.db] [--version v1]
+    python3 living_taxonomy/apply_to_db.py [--db askchem.db] [--version v1]
 """
 
 from __future__ import annotations
