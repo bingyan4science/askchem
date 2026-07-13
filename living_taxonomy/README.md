@@ -5,13 +5,13 @@ Isolated pilot for re-structuring AskChem into living knowledge trees
 validates the **placement** idea on a small focused paper set **before**
 touching the production index.
 
-Safety: reads `chemtree.db` strictly read-only (`immutable=1`). Writes
+Safety: reads `askchem.db` strictly read-only (`immutable=1`). Writes
 nothing to the DB; all output goes to `living_taxonomy/output/`.
 
 ## View the living tree locally
 
 ```bash
-source ~/.bashrc                 # needed for PORTKEY_API_KEY (Advisor uses Gemini)
+source ~/.bashrc                 # needed for PORTKEY_API_KEY for Gemini
 python3 living_taxonomy/serve_ltree.py    # lightweight server, http://127.0.0.1:8126
 # open http://127.0.0.1:8126  ->  "Living Tree" tab
 ```
@@ -32,7 +32,7 @@ python3 living_taxonomy/run_pilot.py --view by_reaction_type --papers 30
 python3 living_taxonomy/run_pilot.py --view by_substance_class --papers 30
 ```
 
-Optional Gemini (NYU gateway) adjudication of gray-zone placements:
+Optional Gemini adjudication of gray-zone placements:
 
 ```bash
 export PORTKEY_API_KEY=...   # NYU AI gateway key
