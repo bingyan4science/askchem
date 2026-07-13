@@ -4,7 +4,7 @@
 
 AskChem changes the unit of retrieval from the *paper* to the **provenance-carrying claim**: each paper is segmented into atomic, typed claims, each grounded by a verbatim source quote and a DOI. Over this shared claim store, AskChem exposes complementary structures for search and synthesis, so scientists and AI agents can retrieve specific findings, inspect their evidence, and assemble cross-paper answers without first reading and filtering whole documents.
 
-**Live at [askchem.org](https://askchem.org)** · **Dataset on [HuggingFace](https://huggingface.co/datasets/bing-yan/askchem)** · **Paper: AskChem (EMNLP 2026 System Demonstrations)**
+**Live at [askchem.org](https://askchem.org)** · **Dataset on [HuggingFace](https://huggingface.co/datasets/bing-yan/askchem)**
 
 ## What's Inside
 
@@ -168,20 +168,6 @@ cd src && uvicorn askchem.server:app --host 0.0.0.0 --port 8420 --reload
 | `GET /api/docs` | Interactive OpenAPI documentation |
 
 Anonymous access is rate-limited to 60 requests/min; an API key (`Authorization: Bearer ac-...`) raises it to 300/min. All endpoints are also available under `/v1/` with key authentication.
-
-## Citation
-
-If you use AskChem, please cite the system demonstration paper:
-
-```bibtex
-@inproceedings{yan2026askchem,
-  title     = {AskChem: A Structured Claim Index for Cross-Paper Chemistry Search},
-  author    = {Yan, Bing and Wolfe, Gregory and Martiniani, Stefano and Cho, Kyunghyun},
-  booktitle = {Proceedings of EMNLP 2026 (System Demonstrations)},
-  year      = {2026},
-  url       = {https://askchem.org}
-}
-```
 
 ## Links
 
