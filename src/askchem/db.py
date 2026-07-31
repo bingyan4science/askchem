@@ -3859,12 +3859,10 @@ def search_claims(query: str, claim_type: str = None, view: str = None,
             if (claim_results and cross_rerank_enabled()
                     and not _env_enabled("CHEMTREE_DISABLE_RERANK")):
                 from askchem.embeddings import _claim_to_text
-                # Hard cap at 50 (May-14 ablation: top-20 nDCG@10 unchanged
-                # vs. uncapped max(50, limit*2)). At limit=500 the uncapped
-                # value would be 1000, which pushes the cross-encoder past
-                # the 90 s Nginx timeout on the 2-CPU VPS. Positions 51+
-                # fall back to dense+FTS+RRF ordering, which is the same
-                # quality AskChem shipped before Phase gamma1.
+                # Hard cap at 50: top-20 nDCG@10 was unchanged versus the
+                # uncapped max(50, limit*2). At limit=500 the uncapped value
+                # would be 1000 and can exceed common reverse-proxy timeouts
+                # on CPU-only hosts. Positions 51+ retain dense+FTS+RRF order.
                 # May-15 ablation knob: CHEMTREE_RERANK_WINDOW shrinks
                 # the window (e.g. 30) to trade a small nDCG drop for
                 # ~40% cross-encoder latency reduction on CPU.

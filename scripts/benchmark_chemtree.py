@@ -63,12 +63,10 @@ CROSSREF_HEADERS = {
 # recall + vector all fused in search_claims), merge by claim_id,
 # diversify to ≤40 claims with ≤4 per source, then a grounded synthesiser.
 #
-# Concurrency note: prod /api/search runs hybrid retrieval (FTS + vector
-# rerank) on a single VPS CPU and takes ~7-9 s per short query. Hammering
-# it with 4 concurrent calls saturates the backend; 2 in-flight is the
-# sweet spot — enough overlap to shorten the wall-clock without stacking
-# rerankers. Timeout is generous (60 s) because the first call after a
-# warm-up gap can take >20 s.
+# Concurrency note: hybrid retrieval combines FTS, vector search, and reranking
+# and can saturate a CPU-only instance. Two in-flight requests provide useful
+# overlap without stacking too many rerankers. The timeout remains generous
+# because the first request after a warm-up gap can be substantially slower.
 UNIFIED_MAX_CLAIMS = 40
 UNIFIED_MAX_PER_SOURCE = 4
 UNIFIED_LIMIT_PER_QUERY = 20
@@ -1358,9 +1356,9 @@ def query_askchem(params: dict) -> tuple[list[dict], int]:
 # over that single engine.
 #
 # The remaining variation worth testing is purely retrieval-side: long
-# natural-language questions sent verbatim to `/api/search` time out (504
-# at nginx after 30 s), so we keep an LLM rewriter that produces 3-4 short
-# keyword sub-queries, run them concurrently, and merge.
+# long natural-language questions sent verbatim to `/api/search` can exceed
+# common reverse-proxy timeouts, so we keep an LLM rewriter that produces 3-4
+# short keyword sub-queries, runs them concurrently, and merges them.
 
 _LLM_REWRITER_CACHE_PATH = Path(__file__).parent / "llm_rewriter_cache.json"
 

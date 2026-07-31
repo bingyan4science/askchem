@@ -46,7 +46,7 @@ echo "[$(date +%T)] === starting encode ==="
 # sentence-transformers, so docs must use the same recipe. The May-5
 # run accidentally used mean pooling and the resulting vectors were
 # ~0.04 cos off the query subspace, halving Recall@20 at full corpus
-# scale. See docs/plans/2026-05-03-phase-alpha-gamma-rollout.md (γ2).
+# scale.
 $PYTHON -u code/encode_mxbai_cluster.py \
     --jsonl   data/claims.jsonl \
     --out-npz out/embeddings.v2.npz \

@@ -15,11 +15,9 @@ Public surface (mirrors ``embeddings.py``):
     semantic_rerank(...)   — re-score a candidate id list
     reload_embeddings()    — drop caches, force re-load
 
-The bake-off
-(``docs/plans/2026-05-02-sprint-c-bakeoff-results.md``) ranked
-``mxbai-embed-large-v1`` first by nDCG@10 (+0.088 vs MiniLM control on
-the 10K pilot).  ``γ2`` re-embeds the full 2.34 M-claim corpus with
-this encoder; this module loads that re-embedded corpus.
+An encoder bake-off ranked ``mxbai-embed-large-v1`` first by nDCG@10
+(+0.088 versus the MiniLM control on a 10K-claim pilot). This module
+loads the full corpus encoded with that model.
 """
 
 from __future__ import annotations
@@ -211,12 +209,11 @@ def load_embeddings() -> None:
         os.environ.get("CHEMTREE_KEEP_EMBEDDINGS", "0") == "1"
     )
 
-    # δ3 (May 11): on the prod VPS we deploy *only* the FAISS index +
-    # claim-id sidecar (~3 GB) and skip the 2-10 GB matrix to keep the
-    # 8 GB droplet honest. ``CHEMTREE_KEEP_EMBEDDINGS=0`` (the default)
-    # already drops the matrix after FAISS is built; here we also
-    # accept the matrix file being missing, as long as both the FAISS
-    # index and the sidecar are present. Set
+    # Memory-constrained deployments can ship only the FAISS index and
+    # claim-id sidecar (~3 GB), skipping the 2-10 GB matrix.
+    # ``CHEMTREE_KEEP_EMBEDDINGS=0`` (the default) already drops the matrix
+    # after FAISS is built; here we also accept the matrix file being missing,
+    # as long as both the FAISS index and sidecar are present. Set
     # ``CHEMTREE_KEEP_EMBEDDINGS=1`` to require the matrix (only
     # needed for offline reranking / rebuilding the FAISS).
     ids_sidecar = EMBEDDINGS_PATH.with_suffix(".claim_ids.npy")

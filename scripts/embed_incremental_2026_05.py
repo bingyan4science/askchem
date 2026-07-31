@@ -2,8 +2,8 @@
 """Incremental embedding of the new claims from this ingestion.
 
 Avoids a full 2.4M-row re-embed (5-8h on MPS) by:
-  1. Loading existing ``claim_embeddings.v2_256.{faiss,claim_ids.npy}``
-     (the production 256-d Matryoshka FAISS that the VPS serves).
+  1. Loading an existing
+     ``claim_embeddings.v2_256.{faiss,claim_ids.npy}`` Matryoshka index.
   2. Identifying claims in chemtree.db whose claim_id is NOT in
      ``claim_ids.npy`` — those are the new ones.
   3. Encoding the new claims with the same mxbai-embed-large-v1 / 1024-d

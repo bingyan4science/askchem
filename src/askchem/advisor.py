@@ -193,11 +193,10 @@ def live_analysis(view_id, node_id, doi, store=True):
 def _live_enabled() -> bool:
     """Whether to attempt the live LLM fallback for a missing row.
 
-    Prod (the DigitalOcean VPS) cannot reach the NYU gateway (it resolves to a
-    private 10.x address, VPN-only), so attempting a live call there would just
-    stall until the curl timeout. We gate it on PORTKEY_API_KEY being present
-    AND CHEMTREE_ADVISOR_NO_LIVE being unset, so prod serves purely from the
-    precomputed `paper_analysis` rows and fails fast for anything not stored.
+    The live gateway may be unavailable from self-hosted environments. Gate
+    calls on PORTKEY_API_KEY and CHEMTREE_ADVISOR_NO_LIVE so deployments can
+    serve precomputed `paper_analysis` rows and fail fast when live analysis is
+    disabled.
     """
     return bool(os.environ.get("PORTKEY_API_KEY")) and not os.environ.get(
         "CHEMTREE_ADVISOR_NO_LIVE")

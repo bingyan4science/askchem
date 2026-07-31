@@ -78,12 +78,11 @@ _paw_available: bool | None = None
 def _check_paw() -> bool:
     """Return True iff PAW (programasweights) is importable AND not disabled.
 
-    The CHEMTREE_DISABLE_PAW kill-switch was added for the May-14 ablation
-    that measures the cost of dropping PAW entirely (saves ~640 MB resident
-    on the 8 GB VPS — two copies of qwen3-0.6b are loaded for intent +
-    normalizer). Set CHEMTREE_DISABLE_PAW=1 to force every classify_intent
-    / normalize_query / detect_contradiction etc. call through the
-    documented fallback paths.
+    Disabling PAW saves roughly 640 MB of resident memory because separate
+    qwen3-0.6b programs are loaded for intent and normalization. Set
+    CHEMTREE_DISABLE_PAW=1 to force classify_intent, normalize_query,
+    detect_contradiction, and related calls through their documented
+    fallback paths.
     """
     global _paw_available
     if os.environ.get("CHEMTREE_DISABLE_PAW", "0") == "1":

@@ -1,16 +1,7 @@
-"""Lightweight v2-prod retrieval-quality probe for the δ5 closeout.
+"""Lightweight retrieval-quality comparison between two AskChem endpoints.
 
-The plan's `Final A/B` row calls for ``scripts/benchmark_chemtree.py``
-against prod + local, but the v1-prod baseline is *gone* the moment
-``deploy_to_vps.sh`` flips the switch and the old April benchmark
-JSON files in this directory are against an entirely different DB
-revision (pre-contextualisation, pre-paper-summary, pre-taxonomy
-reorg). Re-running the full 30-question benchmark to compare against
-those numbers would conflate four years of DB drift with the
-encoder swap.
-
-This script does the *retrieval* half cleanly: it hits both the prod
-URL and (optionally) a local v2 endpoint with a curated 10-probe set
+This script compares a public or remote endpoint with an optional local
+endpoint using a curated 10-probe set
 spanning the 5 bake-off families (reaction, technique, substance,
 property, paper) and records:
 
@@ -27,8 +18,6 @@ Usage::
         --label v2-prod-may11
     python3 scripts/eval_prod_ab.py --prod http://127.0.0.1:8420/api \\
         --label v2-local-may11
-
-Both runs feed the rollout-plan tail-item "§8 Final A/B".
 """
 
 from __future__ import annotations

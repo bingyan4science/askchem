@@ -1,9 +1,8 @@
 """Phase γ1 cross-encoder reranker — final stage of the v2 retrieval
 pipeline.
 
-The bake-off (``docs/plans/2026-05-04-sprint-c-rerank-results.md``)
-selected ``cross-encoder/ms-marco-MiniLM-L-6-v2`` reranking the top-20
-of the dense ANN candidates as the production config.  It lifts
+An evaluation selected ``cross-encoder/ms-marco-MiniLM-L-6-v2`` for
+reranking the top-20 dense ANN candidates. It lifts
 nDCG@10 by **+0.022** over the dense-only mxbai baseline (and **+0.110**
 over today's MiniLM-only retrieval) at p95 latency 150 ms on Apple-MPS,
 well inside the 400 ms budget.

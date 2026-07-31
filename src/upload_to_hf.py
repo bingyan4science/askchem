@@ -40,17 +40,15 @@ DB_PATH = (REPO_ROOT / "askchem.db") if (REPO_ROOT / "askchem.db").exists() \
 DB_FILE = "askchem.db"
 REPO_ID = "bing-yan/askchem"
 
-# v2 retrieval artefacts (γ2 / δ3). Four files cover the prod runtime
-# across both droplet sizes we currently care about:
+# v2 retrieval artefacts. Four files cover both full-quality and
+# memory-constrained self-hosted runtimes:
 #   • the 1024-d FAISS IndexFlatIP — only practical on hosts with ≥
-#     16 GB free RAM (laptop dev box & future bigger droplets);
-#   • the 256-d Matryoshka FAISS — 4× smaller, the one we actually
-#     ship to the current 8 GB DigitalOcean droplet (deploy_to_vps.sh
-#     sets CHEMTREE_V2_DIM=256 to select it);
+#     16 GB free RAM;
+#   • the 256-d Matryoshka FAISS — 4× smaller for constrained hosts
+#     (set CHEMTREE_V2_DIM=256 to select it);
 #   • the claim-id sidecar that ``embeddings_v2.load_embeddings`` reads
-#     with mmap so the deploy avoids materialising the 10 GB npz
-#     (works for both dims; deploy_to_vps.sh symlinks the
-#     ``_256.claim_ids.npy`` view); and
+#     with mmap so runtimes avoid materialising the 10 GB npz
+#     (works for both dimensions); and
 #   • the source npz, optional but uploaded for reproducibility so
 #     anyone can rebuild a different FAISS variant (HNSW, IVF-PQ,
 #     other Matryoshka dims, etc.) from the same vectors that the
@@ -382,7 +380,7 @@ def package_dataset(output_dir: Path, abstract_only: bool = False,
             f"- `embeddings_v2/claim_embeddings.v2_256.faiss` -- "
             f"Matryoshka-truncated 256-d FAISS IndexFlatIP "
             f"({faiss256_gb:.1f} GB; LFS) -- ~5 nDCG@10 point recall loss, "
-            f"4x smaller, what we ship to the 8 GB VPS\n"
+            f"4x smaller and suitable for memory-constrained hosts\n"
             f"- `embeddings_v2/claim_embeddings.v2.claim_ids.npy` -- "
             f"Row-aligned claim-id sidecar shared by both indices "
             f"(memory-mapped at load time, {ids_mb:.0f} MB)\n"

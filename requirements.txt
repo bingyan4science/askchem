@@ -6,12 +6,10 @@ pydantic>=2.0.0
 rdkit>=2024.3.1
 PyJWT[crypto]>=2.8.0
 
-# v2 retrieval stack (δ3 ship-to-prod, May 11). Required by
-# CHEMTREE_RETRIEVER_VERSION=v2 (chemtree.embeddings_v2 +
-# chemtree.cross_encoder_rerank). Pins are deliberately permissive
-# because both local dev and the VPS have these installed at newer
-# versions than the lower bounds and we don't want a fresh
-# `pip install -r requirements.txt` to silently downgrade them.
+# v2 retrieval stack. Required by CHEMTREE_RETRIEVER_VERSION=v2
+# (askchem.embeddings_v2 + askchem.cross_encoder_rerank). Lower bounds are
+# deliberately permissive so package installation does not downgrade a newer,
+# compatible environment.
 #
 #   torch              — verified working at 2.5–2.11. Lower bound is
 #                        2.5 because that's the first release line
@@ -29,7 +27,7 @@ PyJWT[crypto]>=2.8.0
 #                        CHEMTREE_FAISS_MMAP.
 #   numpy              — 1.26+ (both 1.x and 2.x ABIs verified).
 #   huggingface_hub    — 0.24+ (both 0.x and 1.x verified; 1.x ships
-#                        the new `hf` CLI used by deploy_to_vps.sh).
+#                        the `hf` CLI used by the self-hosting instructions).
 torch>=2.5
 transformers>=4.45
 sentence-transformers>=3.0

@@ -105,7 +105,7 @@ def main() -> int:
             f"DOI exist={doi*100:5.1f}%  relevance={rel:.2f}"
         )
     print(f"\nbackup at {bak.relative_to(REPO_ROOT)}")
-    print("restart askchem.service to invalidate the 1h /api/benchmark cache.")
+    print("restart the AskChem server to invalidate the /api/benchmark cache.")
     return 0
 
 

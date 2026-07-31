@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
 """Pre-warm askchem's LRU result cache with likely internal-test queries.
 
-Run on the prod box (or via cron) shortly after a service restart and
-periodically thereafter (every ~6 h is fine, since the LRU TTL is 24 h).
+Run on a self-hosted instance (or via cron) shortly after a service restart
+and periodically thereafter.
 Each query hits the local FastAPI endpoint; the search_claims LRU
 short-circuits subsequent identical requests for ~50 ms response.
 
 Usage:
-    /opt/askchem/venv/bin/python /opt/askchem/scripts/prewarm_cache.py
-    # or via /etc/cron.d/askchem-prewarm
+    python scripts/prewarm_cache.py
 
 Environment overrides:
     ASKCHEM_LOCAL_URL   default http://127.0.0.1:8420

@@ -1,11 +1,10 @@
 """Phase γ2: full re-embed of the claim corpus with the bake-off winner.
 
 Encoder: ``mixedbread-ai/mxbai-embed-large-v1`` (1024 dim, MTEB-leading,
-Matryoshka-truncatable).  Chosen by the Sprint-C encoder bake-off
-(see ``docs/plans/2026-05-02-sprint-c-bakeoff-results.md``).
+Matryoshka-truncatable), selected by the encoder bake-off.
 
 This script is intentionally **standalone** — it does not modify the
-production ``data/claim_embeddings.npz``.  Output paths are ``*.v2.npz``
+existing ``data/claim_embeddings.npz``. Output paths are ``*.v2.npz``
 and ``*.v2.faiss`` so that the existing ``embeddings.py`` (still on
 MiniLM) keeps serving traffic until we explicitly flip a switch.
 

@@ -113,30 +113,37 @@ tests/                   # Test suite
 docs/                    # Architecture notes and documentation
 ```
 
-## Deployment (askchem.org)
+## Self-hosting
 
 ### Prerequisites
 
-- A VPS with Docker and Docker Compose installed
-- The `askchem.org` domain DNS pointing to the server's IP (A record)
+- Docker and Docker Compose
+- A domain name if you want automatic HTTPS
 - The `askchem.db` SQLite database file (hosted on HuggingFace)
 
-### Deploy
+### Run
 
 ```bash
-# 1. Clone the repo on your server
-git clone https://github.com/bingyan4science/askchem.git /opt/askchem
-cd /opt/askchem
+# 1. Clone the repository
+git clone https://github.com/bingyan4science/askchem.git
+cd askchem
 
 # 2. Fetch the database (SQLite + FTS5 + baked-in taxonomy)
 mkdir -p data
-huggingface-cli download bing-yan/askchem askchem.db --local-dir data
+hf download bing-yan/askchem askchem.db --repo-type dataset --local-dir data
 
-# 3. Launch (Caddy handles HTTPS automatically)
-docker compose up -d
+# 3. Launch locally
+docker compose up --build -d
+# Open https://localhost
+
+# For a public instance, set your own domain:
+ASKCHEM_DOMAIN=chemistry.example.org docker compose up --build -d
 ```
 
-Caddy automatically obtains a Let's Encrypt certificate for `askchem.org` and serves the site over HTTPS.
+Caddy automatically obtains a Let's Encrypt certificate when
+`ASKCHEM_DOMAIN` is a publicly resolvable domain. These instructions create an
+independent AskChem instance; they do not reproduce the private operational
+configuration used by askchem.org.
 
 ### Local Development
 

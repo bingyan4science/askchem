@@ -16,8 +16,7 @@ Why direct ``transformers`` instead of ``sentence_transformers``:
   (``--pooling cls``). The first cluster run (May 5) accidentally used
   mean pooling and the resulting vectors were ~0.04 cos off the
   sentence-transformers query subspace, halving Recall@20 at full
-  corpus scale. See
-  ``docs/plans/2026-05-03-phase-alpha-gamma-rollout.md`` (γ2 results).
+  corpus scale.
 
 Throughput envelope on a single H200 SXM (141 GB HBM3e, bf16):
 - batch_size 256, seq_len 256 → ~5–8 k claims/s tokenize-bound

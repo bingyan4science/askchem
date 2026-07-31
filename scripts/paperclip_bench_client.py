@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Paperclip client for AskChem-Bench (requires Python 3.10+).
 
-The upstream SDK routes API-key auth to ``/papers`` (nginx 405); production
-accepts API keys on ``/mcp``. This module fixes that and exposes search/lookup/
-papers helpers for ``benchmark_chemtree.py``.
+The upstream SDK routes API-key auth to ``/papers``, while AskChem-compatible
+instances accept API keys on ``/mcp``. This module adapts that behavior and
+exposes search, lookup, and paper helpers for ``benchmark_chemtree.py``.
 
 Run standalone smoke tests::
 

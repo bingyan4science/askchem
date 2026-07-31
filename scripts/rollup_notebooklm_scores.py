@@ -340,7 +340,7 @@ def main() -> int:
         print(f"merged notebooklm aggregate into {BENCH_PATH.relative_to(REPO_ROOT)}")
         print(f"  (previous JSON saved to {bak.relative_to(REPO_ROOT)})")
         print(
-            "  restart askchem.service to invalidate the 1h /api/benchmark cache."
+            "  restart the AskChem server to invalidate the /api/benchmark cache."
         )
 
     return 0
