@@ -8,7 +8,7 @@ AskChem changes the unit of retrieval from the *paper* to the **source-grounded 
 
 ## What's Inside
 
-- **2.44M provenance-carrying claims** from **146.6K papers** (1925–2026) — each is a typed assertion with a verbatim quote and source DOI.
+- **2.44M source-grounded claims** from **146.6K papers** (1925–2026) — each is a typed assertion with a verbatim quote and source DOI.
 - **Gemini full-paper extraction** — claims from full PDFs and abstracts were extracted with Gemini 3.1 Pro. `extraction_model` and `extraction_version` identify the provenance of each claim.
 - **Three complementary structures over one shared claim store:**
   - **Stabilized faceted taxonomy** — normalized L1/L2/L3 paths for reaction type, substance, application, technique, mechanism, extracted data, and claim type, complemented by temporal, author, and evidence-network navigation.
