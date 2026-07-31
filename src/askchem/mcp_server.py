@@ -25,11 +25,19 @@ except ImportError:
 from askchem.store import AskChemStore
 
 INDEX_DIR = Path(__file__).parent.parent.parent / "chemtree_index"
+PUBLIC_CONTENT_VIEWS = [
+    "by_reaction_type",
+    "by_substance_class",
+    "by_technique",
+    "by_application",
+    "by_mechanism",
+]
 
 
 def create_server():
     store = AskChemStore(INDEX_DIR)
     server = Server("askchem")
+    view_names = ", ".join(PUBLIC_CONTENT_VIEWS)
 
     @server.list_tools()
     async def list_tools() -> list[Tool]:
@@ -38,7 +46,7 @@ def create_server():
                 name="askchem_browse",
                 description=(
                     "Browse the AskChem knowledge hierarchy. "
-                    "Views: by_reaction_type, by_substance_class, by_application, by_technique, by_mechanism. "
+                    f"Views: {view_names}. "
                     "Returns categories and claims organized hierarchically."
                 ),
                 inputSchema={
@@ -46,8 +54,8 @@ def create_server():
                     "properties": {
                         "view": {
                             "type": "string",
-                            "description": "View to browse: by_reaction_type, by_substance_class, by_application, by_technique, by_mechanism",
-                            "enum": ["by_reaction_type", "by_substance_class", "by_application", "by_technique", "by_mechanism"],
+                            "description": f"View to browse: {view_names}",
+                            "enum": PUBLIC_CONTENT_VIEWS,
                         },
                         "path": {
                             "type": "string",
@@ -122,7 +130,7 @@ def create_server():
                         "view": {
                             "type": "string",
                             "description": "View to analyze",
-                            "enum": ["by_reaction_type", "by_substance_class", "by_application", "by_technique", "by_mechanism"],
+                            "enum": PUBLIC_CONTENT_VIEWS,
                         },
                         "path": {
                             "type": "string",

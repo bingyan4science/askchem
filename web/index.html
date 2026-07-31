@@ -2466,8 +2466,8 @@
                                 <div style="font-size: 0.8rem; color: var(--text-secondary);">Organizes claims by chemical transformation — catalysis, coupling, oxidation, etc.</div>
                             </div>
                             <div class="view-card" onclick="selectViewById('by_substance_class')" style="cursor:pointer; padding: 0.75rem 1rem; border: 1px solid var(--border); border-radius: var(--radius); transition: all var(--transition);">
-                                <div style="font-weight: 600; font-size: 0.9rem;">🔬 By Substance/Material Class</div>
-                                <div style="font-size: 0.8rem; color: var(--text-secondary);">Browse by molecule or material — MOFs, polymers, nanoparticles, biomolecules, etc.</div>
+                                <div style="font-weight: 600; font-size: 0.9rem;">🔬 Substance</div>
+                                <div style="font-size: 0.8rem; color: var(--text-secondary);">Browse by chemical substance class — inorganic compounds, polymers, biomolecules, and more.</div>
                             </div>
                             <div class="view-card" onclick="selectViewById('by_technique')" style="cursor:pointer; padding: 0.75rem 1rem; border: 1px solid var(--border); border-radius: var(--radius); transition: all var(--transition);">
                                 <div style="font-weight: 600; font-size: 0.9rem;">⚙️ By Technique/Method</div>
@@ -2642,8 +2642,8 @@
                             <tr><th style="text-align:left; padding: 0.3rem 0.5rem; border-bottom: 1px solid var(--border);">Access Level</th><th style="text-align:left; padding: 0.3rem 0.5rem; border-bottom: 1px solid var(--border);">Rate Limit</th><th style="text-align:left; padding: 0.3rem 0.5rem; border-bottom: 1px solid var(--border);">Auth</th></tr>
                         </thead>
                         <tbody>
-                            <tr><td style="padding: 0.3rem 0.5rem;">Anonymous</td><td style="padding: 0.3rem 0.5rem;">60 requests/min</td><td style="padding: 0.3rem 0.5rem;">None</td></tr>
-                            <tr><td style="padding: 0.3rem 0.5rem;">API Key</td><td style="padding: 0.3rem 0.5rem;">300 requests/min</td><td style="padding: 0.3rem 0.5rem;"><code>Authorization: Bearer ac-...</code></td></tr>
+                            <tr><td style="padding: 0.3rem 0.5rem;">Anonymous</td><td style="padding: 0.3rem 0.5rem;">100 requests/min · 5,000/day</td><td style="padding: 0.3rem 0.5rem;">None</td></tr>
+                            <tr><td style="padding: 0.3rem 0.5rem;">API Key</td><td style="padding: 0.3rem 0.5rem;">Tiered limits from 200 requests/min</td><td style="padding: 0.3rem 0.5rem;"><code>Authorization: Bearer ac-...</code></td></tr>
                         </tbody>
                     </table>
                     <p style="margin: 0.5rem 0 0; color: var(--text-secondary);"><a href="#" onclick="if(_currentUser){showPage('profile'); selectProfileTab('api-keys');}else{clerkSignIn();} return false;" style="color:var(--accent);">Sign in</a> and create an API key from your profile (<code>POST /api/me/api-keys</code>, authenticated). Rate limit headers (<code>X-RateLimit-Limit</code>, <code>X-RateLimit-Remaining</code>, <code>X-RateLimit-Reset</code>) are included in every response.</p>
@@ -2706,7 +2706,7 @@
                 <div class="api-endpoint">
                     <span class="api-method get">GET</span>
                     <span class="api-path">/api/views</span>
-                    <div class="api-desc">List all hierarchical views (reaction type, substance class, technique, application, mechanism, claim type, author).</div>
+                    <div class="api-desc">List all hierarchical views (reaction type, substance, technique, application, mechanism, claim type, author).</div>
                 </div>
 
                 <div class="api-endpoint">
@@ -2834,7 +2834,7 @@
   "extraction_version": "deep_v1",
   "view_paths": {
     "by_reaction_type": "Electrocatalysis/CO2 Reduction",
-    "by_substance_class": "Single-Atom Catalysts/Ni-based",
+    "by_substance_class": "Inorganic Compounds/Metals/Nickel",
     "by_technique": "Electrochemistry/Linear Sweep Voltammetry"
   }
 }</pre>
@@ -4046,7 +4046,7 @@ pip install mcp</pre>
                 "## When to use",
                 "",
                 "- Literature-backed answers with citations",
-                "- Exploring topics via hierarchical browse (reaction type, substance class, technique, …)",
+                "- Exploring topics via hierarchical browse (reaction type, substance, technique, …)",
                 "- Finding experts by topic (author search) or papers by title",
                 "",
                 "## Core REST endpoints (same origin)",
@@ -7813,7 +7813,7 @@ pip install mcp</pre>
         var _featuredFirstLoad = true;
         var _viewColors = {
             by_reaction_type:    '#e74c3c',
-            by_substance_class:  '#3498db',
+            by_substance_class:   '#3498db',
             by_application:      '#2ecc71',
             by_technique:        '#f39c12',
             by_mechanism:        '#9b59b6',
@@ -7837,7 +7837,7 @@ pip install mcp</pre>
         // intentionally bypasses that field.
         function _homepageViewCount() {
             // All views are now exposed consistently on both search and browse:
-            // 7 content taxonomies + author + time + network.
+            // 8 content taxonomies + author + time + network.
             return Object.keys(_viewLabels).length;
         }
 
@@ -7972,7 +7972,7 @@ pip install mcp</pre>
                 var views = stats.views || [];
                 var viewInfo = [
                     {id: 'by_reaction_type', icon: '\u2697\uFE0F', desc: 'Coupling, oxidation, polymerization\u2026'},
-                    {id: 'by_substance_class', icon: '\uD83E\uDDEA', desc: 'MOFs, polymers, nanoparticles\u2026'},
+                    {id: 'by_substance_class', icon: '\uD83E\uDDEA', desc: 'Metals, polymers, biomolecules\u2026'},
                     {id: 'by_application', icon: '\uD83C\uDFAF', desc: 'Energy storage, drug delivery\u2026'},
                     {id: 'by_technique', icon: '\uD83D\uDD2C', desc: 'DFT, XRD, NMR, mass spec\u2026'},
                     {id: 'by_mechanism', icon: '\u2699\uFE0F', desc: 'Electron transfer, adsorption\u2026'},

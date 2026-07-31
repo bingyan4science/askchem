@@ -1,8 +1,8 @@
 """
 AskChem Indexer: Populates the store from extracted claims.
 
-Uses GPT-4o to classify each claim into the appropriate position
-in each of the 5 views, then builds the filesystem hierarchy.
+Uses the canonical taxonomy prompt to classify each claim into the appropriate
+position in every content view, then builds the filesystem hierarchy.
 """
 
 import json
@@ -14,33 +14,17 @@ from .models import Claim, Source, TreeNode, View
 from .store import AskChemStore
 from .llm import get_client, MODELS
 from .display import smart_title
+from .taxonomy import (
+    ALL_CONTENT_VIEWS,
+    FULL_CLASSIFICATION_SYSTEM_PROMPT,
+    normalize_path,
+)
 
-CLASSIFICATION_PROMPT = """You are classifying a chemistry knowledge claim into a hierarchical index with 5 views.
+CLASSIFICATION_PROMPT = """Classify this chemistry claim using the supplied canonical taxonomy.
 
 The claim:
 {claim_json}
-
-For each of the 5 views below, provide the hierarchical path where this claim belongs.
-Each path should be 2-5 segments deep, using lowercase_with_underscores for node names.
-Use established chemistry terminology.
-
-Views:
-1. by_reaction_type — Classify by the type of chemical transformation (e.g., coupling > cross_coupling > suzuki)
-2. by_substance_class — Classify by the molecules/materials involved (e.g., organic > aromatics > aryl_halides)
-3. by_application — Classify by practical application (e.g., pharmaceutical > drug_synthesis > c_n_bond_forming)
-4. by_technique — Classify by experimental/computational method (e.g., spectroscopy > raman > operando_raman)
-5. by_mechanism — Classify by underlying mechanism/phenomenon (e.g., catalytic_cycles > oxidative_addition_reductive_elimination)
-
-If a view is not applicable to this claim (e.g., a computational result has no reaction type), use ["not_applicable"].
-
-Return a JSON object:
-{{
-  "by_reaction_type": ["segment1", "segment2", ...],
-  "by_substance_class": ["segment1", "segment2", ...],
-  "by_application": ["segment1", "segment2", ...],
-  "by_technique": ["segment1", "segment2", ...],
-  "by_mechanism": ["segment1", "segment2", ...]
-}}"""
+"""
 
 
 def classify_claim(claim: Claim, max_retries: int = 3) -> dict[str, list[str]]:
@@ -66,7 +50,10 @@ def classify_claim(claim: Claim, max_retries: int = 3) -> dict[str, list[str]]:
         try:
             response = client.chat.completions.create(
                 model=MODELS["fast"],
-                messages=[{"role": "user", "content": prompt}],
+                messages=[
+                    {"role": "system", "content": FULL_CLASSIFICATION_SYSTEM_PROMPT},
+                    {"role": "user", "content": prompt},
+                ],
                 max_completion_tokens=2048,
                 response_format={"type": "json_object"},
             )
@@ -137,7 +124,8 @@ def build_index(store: AskChemStore, claims: list[Claim], sources: list[Source] 
         claim_id = classification["claim_id"]
         paths = classification.get("paths", {})
 
-        for view_id, path in paths.items():
+        for view_id in ALL_CONTENT_VIEWS:
+            path = normalize_path(view_id, paths.get(view_id))
             if not path or path == ["not_applicable"]:
                 continue
 
@@ -162,7 +150,7 @@ def build_index(store: AskChemStore, claims: list[Claim], sources: list[Source] 
             store.assign_claim_to_node(view_id, path, claim_id)
 
     # Update view metadata
-    for view_id in ["by_reaction_type", "by_substance_class", "by_application", "by_technique", "by_mechanism"]:
+    for view_id in ALL_CONTENT_VIEWS:
         view = store.get_view(view_id)
         if view:
             view_nodes = [k for k in node_cache if k[0] == view_id]

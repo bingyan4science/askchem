@@ -16,6 +16,12 @@ __pycache__/
 *.log
 logs/
 
+# Generated evaluation outputs and API caches
+scripts/benchmark_cache_*.json
+scripts/benchmark_results*.json
+scripts/eval_results/
+scripts/*_cache.json
+
 # Virtual environments
 .venv/
 .venv-*/

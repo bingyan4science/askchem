@@ -88,7 +88,10 @@ CANONICAL_L3 = {
             "advanced_oxidant_activation_and_fenton_processes",
             "electrocatalytic_reactions", "photocatalytic_reactions",
             "mechanochemical_and_piezocatalysis",
-            "catalyst_design_and_active_site_engineering", "organic_synthesis", "nanocatalysis", "solid_acid_catalysis", "fine_chemical_synthesis", "surface_science", "hydrochlorination", "organic_transformations", "transesterification", "organic_synthesis", "nanocatalysis", "solid_acid_catalysis", "fine_chemical_synthesis", "surface_science", "other",
+            "catalyst_design_and_active_site_engineering", "organic_synthesis",
+            "nanocatalysis", "solid_acid_catalysis", "fine_chemical_synthesis",
+            "surface_science", "hydrochlorination", "organic_transformations",
+            "transesterification", "other",
         ],
         ("coupling", "c_h_activation"): [
             "directed_c_h_activation", "undirected_c_h_activation", "c_h_borylation",

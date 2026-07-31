@@ -74,7 +74,7 @@ CLAIM_TYPES = [
 
 VIEWS = [
     ("by_reaction_type", "Chemical transformation type"),
-    ("by_substance_class", "Molecules/materials involved"),
+    ("by_substance_class", "Chemical substance class"),
     ("by_application", "Practical application domain"),
     ("by_technique", "Experimental/computational method"),
     ("by_mechanism", "Underlying mechanism/phenomenon"),
@@ -83,10 +83,111 @@ VIEWS = [
     ("by_time_period", "Chronological organization"),
 ]
 
+PUBLIC_TABLE_ALLOWLIST = {
+    "claims", "sources", "tree_nodes", "views",
+    "taxonomy_nodes", "taxonomy_edges", "taxonomy_leaves", "taxonomy_meta",
+    "paper_analysis", "metadata", "authors", "paper_authors",
+    "surprise_scores", "paper_validations", "contradictions",
+    "claim_view_map", "claim_edges", "citations",
+}
+PUBLIC_TABLE_PREFIXES = ("claims_fts", "sources_fts")
+
+
+def _is_public_table(name: str) -> bool:
+    return (
+        name in PUBLIC_TABLE_ALLOWLIST
+        or name.startswith(PUBLIC_TABLE_PREFIXES)
+        or name == "sqlite_sequence"
+    )
+
+
+def build_public_database(source: Path, destination: Path) -> None:
+    """Create a SQLite corpus containing only explicitly allowed tables."""
+    if destination.exists():
+        destination.unlink()
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    destination_conn = sqlite3.connect(destination)
+    try:
+        destination_conn.execute("PRAGMA foreign_keys=OFF")
+        destination_conn.execute("PRAGMA journal_mode=OFF")
+        destination_conn.execute("PRAGMA synchronous=OFF")
+        source_uri = f"file:{source.resolve()}?mode=ro"
+        destination_conn.execute("ATTACH DATABASE ? AS source", (source_uri,))
+
+        table_rows = destination_conn.execute(
+            "SELECT name, sql FROM source.sqlite_master "
+            "WHERE type='table' AND name NOT LIKE 'sqlite_%' AND sql IS NOT NULL "
+            "ORDER BY CASE WHEN sql LIKE 'CREATE VIRTUAL TABLE%' THEN 1 ELSE 0 END, name"
+        ).fetchall()
+        copied_tables: list[str] = []
+        virtual_prefixes = {
+            name for name, sql in table_rows
+            if sql.lstrip().upper().startswith("CREATE VIRTUAL TABLE")
+        }
+        for table, create_sql in table_rows:
+            if table not in virtual_prefixes and any(
+                table.startswith(f"{prefix}_") for prefix in virtual_prefixes
+            ):
+                continue
+            if not _is_public_table(table):
+                continue
+            destination_conn.execute(create_sql)
+            columns = [
+                row[1] for row in destination_conn.execute(
+                    f'PRAGMA source.table_xinfo("{table}")'
+                )
+                if row[6] == 0
+            ]
+            if columns:
+                quoted = ", ".join(f'"{column}"' for column in columns)
+                destination_conn.execute(
+                    f'INSERT INTO "{table}" ({quoted}) '
+                    f'SELECT {quoted} FROM source."{table}"'
+                )
+            copied_tables.append(table)
+            destination_conn.commit()
+
+        for object_type in ("index", "trigger"):
+            rows = destination_conn.execute(
+                "SELECT tbl_name, sql FROM source.sqlite_master "
+                "WHERE type=? AND sql IS NOT NULL ORDER BY name",
+                (object_type,),
+            ).fetchall()
+            for table, create_sql in rows:
+                if table in copied_tables:
+                    destination_conn.execute(create_sql)
+        destination_conn.commit()
+        destination_conn.execute("DETACH DATABASE source")
+
+        remaining = {
+            row[0] for row in destination_conn.execute(
+                "SELECT name FROM sqlite_master "
+                "WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+            )
+        }
+        disallowed = sorted(
+            name for name in remaining if not _is_public_table(name)
+        )
+        if disallowed:
+            raise RuntimeError(
+                f"public DB contains disallowed tables: {disallowed}"
+            )
+        missing = sorted(
+            name for name in PUBLIC_TABLE_ALLOWLIST
+            if any(row[0] == name for row in table_rows) and name not in remaining
+        )
+        if missing:
+            raise RuntimeError(f"public DB is missing allowed tables: {missing}")
+        if destination_conn.execute("PRAGMA quick_check").fetchone()[0] != "ok":
+            raise RuntimeError("public database failed PRAGMA quick_check")
+    finally:
+        destination_conn.close()
+
 
 def package_dataset(output_dir: Path, abstract_only: bool = False,
                     include_db: bool = True,
-                    include_v2_embeddings: Optional[str] = None):
+                    include_v2_embeddings: Optional[str] = None,
+                    source_db: Path = DB_PATH):
     """Package the index into HuggingFace-friendly files.
 
     abstract_only=False (default): publish ALL claims + the chemtree.db file.
@@ -100,7 +201,7 @@ def package_dataset(output_dir: Path, abstract_only: bool = False,
                                   reproducibility (≈ 19.5 GB).
     """
     output_dir.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(str(DB_PATH))
+    conn = sqlite3.connect(str(source_db))
     conn.row_factory = sqlite3.Row
 
     # Claims -> JSONL
@@ -189,7 +290,7 @@ def package_dataset(output_dir: Path, abstract_only: bool = False,
             "AskChem: A structured, hierarchical, multi-view knowledge index "
             "for chemistry research. Claims are extracted from "
             f"{('paper abstracts' if abstract_only else 'paper abstracts AND full PDFs')} "
-            "and classified into 5 content views with a canonical L1/L2 taxonomy "
+            "and classified into canonical single-placement content views "
             "(plus by_claim_type and by_time_period). The full SQLite database "
             "(askchem.db) is provided for fast local serving via the "
             "AskChem reference server. Live API: https://askchem.org."
@@ -202,13 +303,10 @@ def package_dataset(output_dir: Path, abstract_only: bool = False,
 
     # Optionally copy the SQLite database file itself for fast local serving.
     if include_db:
-        print(f"\nCopying {DB_FILE} ({DB_PATH.stat().st_size/1e9:.2f} GB) "
-              f"into upload dir (hardlink if possible)...", flush=True)
+        print(f"\nBuilding sanitized public {DB_FILE} "
+              f"from {source_db.name}...", flush=True)
         dest_db = output_dir / DB_FILE
-        try:
-            os.link(DB_PATH, dest_db)
-        except OSError:
-            shutil.copy2(DB_PATH, dest_db)
+        build_public_database(source_db, dest_db)
 
     # Optionally copy the v2 retrieval artefacts. Staged via os.link so
     # we don't double the on-disk footprint of a 10 GB FAISS index on
@@ -269,7 +367,7 @@ def package_dataset(output_dir: Path, abstract_only: bool = False,
         else "extracted from both paper abstracts (gpt-5-mini) and full PDFs "
              "(Gemini 3.1 Pro via Vertex AI Batch)"
     ) + f" and classified into {view_count} simultaneous hierarchical views."
-    db_size_gb = f"{DB_PATH.stat().st_size / 1e9:.2f} GB" if include_db else "n/a"
+    db_size_gb = f"{source_db.stat().st_size / 1e9:.2f} GB" if include_db else "n/a"
     v2_section = ""
     if include_v2_embeddings:
         faiss_gb = V2_FAISS_PATH.stat().st_size / 1e9
@@ -451,11 +549,19 @@ Note: the software is MIT-licensed; this dataset is released under CC-BY-4.0.
 
 
 def upload(output_dir: Path, abstract_only: bool,
-           include_v2_embeddings: Optional[str] = None):
+           include_v2_embeddings: Optional[str] = None,
+           revision: str | None = None):
+    if not revision:
+        raise ValueError("an immutable --revision is required for uploads")
     api = HfApi()
 
     print(f"\nCreating/updating repo: {REPO_ID}", flush=True)
     create_repo(REPO_ID, repo_type="dataset", exist_ok=True)
+    try:
+        api.create_branch(REPO_ID, branch=revision, repo_type="dataset")
+    except Exception as exc:
+        if "already exists" not in str(exc).lower():
+            raise
 
     label = "abstract-only" if abstract_only else "full (abstract + deep)"
     if include_v2_embeddings:
@@ -465,6 +571,7 @@ def upload(output_dir: Path, abstract_only: bool,
         folder_path=str(output_dir),
         repo_id=REPO_ID,
         repo_type="dataset",
+        revision=revision,
         commit_message=(
             f"Update AskChem index ({label}) -- "
             f"{datetime.now().strftime('%Y-%m-%d')}"
@@ -477,7 +584,8 @@ def upload(output_dir: Path, abstract_only: bool,
 
 def sync_to_hf(abstract_only: bool, include_db: bool,
                include_v2_embeddings: Optional[str] = None,
-               output_dir=None):
+               output_dir=None, source_db: Path = DB_PATH,
+               revision: str | None = None):
     """Package and upload the current index to HuggingFace."""
     print("\nSyncing to HuggingFace...", flush=True)
     cleanup = False
@@ -487,9 +595,11 @@ def sync_to_hf(abstract_only: bool, include_db: bool,
     try:
         package_dataset(output_dir, abstract_only=abstract_only,
                         include_db=include_db,
-                        include_v2_embeddings=include_v2_embeddings)
+                        include_v2_embeddings=include_v2_embeddings,
+                        source_db=source_db)
         upload(output_dir, abstract_only=abstract_only,
-               include_v2_embeddings=include_v2_embeddings)
+               include_v2_embeddings=include_v2_embeddings,
+               revision=revision)
     finally:
         if cleanup:
             shutil.rmtree(output_dir, ignore_errors=True)
@@ -519,6 +629,11 @@ def main():
                     help="Just package to DIR; don't upload")
     ap.add_argument("--upload-only", metavar="DIR",
                     help="Skip packaging; upload an existing directory")
+    ap.add_argument("--source-db", type=Path, default=DB_PATH)
+    ap.add_argument(
+        "--revision",
+        help="Immutable HuggingFace dataset branch/revision for upload",
+    )
     args = ap.parse_args()
 
     print(f"{'='*60}", flush=True)
@@ -531,16 +646,20 @@ def main():
     if args.upload_only:
         upload(Path(args.upload_only),
                abstract_only=args.abstract_only,
-               include_v2_embeddings=args.include_v2_embeddings)
+               include_v2_embeddings=args.include_v2_embeddings,
+               revision=args.revision)
     elif args.package_only:
         package_dataset(Path(args.package_only),
                         abstract_only=args.abstract_only,
                         include_db=not args.no_db,
-                        include_v2_embeddings=args.include_v2_embeddings)
+                        include_v2_embeddings=args.include_v2_embeddings,
+                        source_db=args.source_db)
     else:
         sync_to_hf(abstract_only=args.abstract_only,
                    include_db=not args.no_db,
-                   include_v2_embeddings=args.include_v2_embeddings)
+                   include_v2_embeddings=args.include_v2_embeddings,
+                   source_db=args.source_db,
+                   revision=args.revision)
     print("\nDone!", flush=True)
 
 

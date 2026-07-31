@@ -57,6 +57,7 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--label", required=True,
                     help="Rankings file label (e.g. live-v2-search-baseline).")
+    ap.add_argument("--probes", type=Path, default=PROBES_PATH)
     ap.add_argument("--top", type=int, default=20,
                     help="search_claims limit (and the number of ids "
                     "written to the rankings file).")
@@ -100,7 +101,7 @@ def main() -> None:
     db._load_tree_node_index()
     print("ready.\n")
 
-    probes = load_probes(PROBES_PATH)
+    probes = load_probes(args.probes)
     print(f"loaded {len(probes)} probes")
 
     rankings: list[dict] = []
@@ -109,7 +110,13 @@ def main() -> None:
         t0 = time.monotonic()
         try:
             result = db.search_claims(
-                pr.q, limit=args.top, use_semantic=args.use_semantic,
+                pr.q,
+                claim_type=pr.claim_type,
+                view=pr.view,
+                limit=args.top,
+                use_semantic=args.use_semantic,
+                mode=pr.mode,
+                sort=pr.sort,
             )
             cids = [r.get("claim_id") for r in result.get("results", [])
                     if r.get("claim_id")]

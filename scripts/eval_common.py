@@ -44,6 +44,10 @@ class Probe:
     q: str
     family: str
     notes: str = ""
+    view: str | None = None
+    claim_type: str | None = None
+    mode: str = "auto"
+    sort: str = "relevance"
 
 
 def load_probes(path: Path = PROBES_PATH) -> list[Probe]:
@@ -56,6 +60,10 @@ def load_probes(path: Path = PROBES_PATH) -> list[Probe]:
         out.append(Probe(
             id=d["id"], q=d["q"], family=d["family"],
             notes=d.get("notes", ""),
+            view=d.get("view"),
+            claim_type=d.get("claim_type"),
+            mode=d.get("mode", "auto"),
+            sort=d.get("sort", "relevance"),
         ))
     return out
 

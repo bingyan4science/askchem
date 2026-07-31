@@ -3,16 +3,16 @@
 
 The `by_data` view surfaces the specific tables/numbers that scientists
 need but are usually buried in paper figures and SI tables. It groups
-data-bearing claims into a 2-level taxonomy:
+data-bearing claims into a 3-level taxonomy:
 
     L1: <data_category>     e.g. electrochemical, optical, mechanical
-    L2: <measurement_name>  e.g. ionic_conductivity, band_gap, bet_surface_area
+L2: <canonical_metric>   e.g. ionic_conductivity, band_gap, bet_surface_area
+L3: <context>            e.g. general, product_co, reaction_co2_reduction
 
-A claim is eligible if it has BOTH a non-empty `property_category` and
-a non-empty `property_name` (this is the structured signal we already
-get for free from extraction). For non-property claims we fall back to a
-claim_type-derived category when explicit fields are missing but the
-claim has a `value` field.
+A claim is eligible when it has a measurement-bearing claim type and a
+non-empty `property_name`. Canonical categories are derived from the metric,
+not trusted from noisy extraction output. Measurement-like claims may use
+their subject as a conservative fallback when they carry an explicit value.
 
 Usage:
     python scripts/build_data_view.py dryrun [--limit N]
@@ -40,6 +40,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 from askchem.db import get_db_path  # noqa: E402
+from askchem.measurement_canonical import (  # noqa: E402
+    METRIC_DISPLAY,
+    canonicalize_measurement,
+)
 
 
 VIEW_ID = "by_data"
@@ -56,53 +60,6 @@ VIEW_DESCRIPTION = (
 # precomputing avoids a slow batched IN-fetch on every page load.
 L1_TOP_CHILDREN_N = 200
 
-
-# Canonical L1 buckets. Map raw `property_category` values (lowercased,
-# trimmed) to one of these buckets. Anything not listed falls into 'other'.
-CATEGORY_MAP = {
-    # Direct hits / no-op
-    "physical":            "physical",
-    "chemical":            "chemical",
-    "electrochemical":     "electrochemical",
-    "spectroscopic":       "spectroscopic",
-    "biological":          "biological",
-    "optical":             "optical",
-    "thermal":             "thermal",
-    "mechanical":          "mechanical",
-    "electrical":          "electrical",
-    "electronic":          "electronic",
-    "magnetic":            "magnetic",
-    "analytical":          "analytical",
-    "computational":       "computational",
-    "kinetic":             "kinetic",
-    "photochemical":       "photochemical",
-    "biochemical":         "biochemical",
-    "environmental":       "environmental",
-    # Synonyms / merges
-    "structure":           "structural",
-    "structural":          "structural",
-    "energy":              "energetic",
-    "energetic":           "energetic",
-    "energetics":          "energetic",
-    "thermodynamic":       "energetic",
-    "thermochemical":      "energetic",
-    "theoretical":         "computational",
-    "mathematical":        "computational",
-    "dynamic":             "kinetic",
-    "kinetics":            "kinetic",
-    "economic":            "economic",
-}
-
-# When property_category is missing, fall back from claim_type.
-CLAIM_TYPE_TO_CATEGORY = {
-    "computational_result": "computational",
-    "measurement":          "experimental",
-    "data_point":           "experimental",
-    "parameter":            "experimental",
-    "performance":          "performance",
-    "experimental_result":  "experimental",
-    "equation":             "mathematical_model",
-}
 
 # Display labels for L1 buckets in the UI / tree_nodes.name.
 CATEGORY_DISPLAY = {
@@ -129,6 +86,7 @@ CATEGORY_DISPLAY = {
     "performance":        "Performance Metrics",
     "mathematical_model": "Equations / Models",
     "economic":           "Economic",
+    "uncategorized":      "Uncategorized / Review Required",
     "other":              "Other",
 }
 
@@ -144,26 +102,6 @@ ALWAYS_INSPECT_TYPES = {
 
 
 _NUMERIC_RE = re.compile(r"\d")
-
-
-def _normalize_category(raw, claim_type: str | None) -> str | None:
-    raw_str = _coerce_str(raw)
-    if raw_str:
-        key = raw_str.strip().lower()
-        if key in CATEGORY_MAP:
-            return CATEGORY_MAP[key]
-        # Best-effort: collapse common compound categories (split on any
-        # non-letter and try the first token).
-        head = re.split(r"[^a-z]+", key, maxsplit=1)[0]
-        if head and head in CATEGORY_MAP:
-            return CATEGORY_MAP[head]
-    if claim_type and claim_type in CLAIM_TYPE_TO_CATEGORY:
-        return CLAIM_TYPE_TO_CATEGORY[claim_type]
-    return None
-
-
-_PAREN_RE = re.compile(r"\([^)]*\)")
-_NONWORD_RE = re.compile(r"[^a-z0-9]+")
 
 
 def _coerce_str(raw) -> str | None:
@@ -187,34 +125,6 @@ def _coerce_str(raw) -> str | None:
     return None
 
 
-def _normalize_measurement_name(raw) -> str | None:
-    """Normalize a property_name to a stable tree-path segment.
-
-    Lowercase, strip parenthetical text, collapse non-alphanumeric runs
-    to underscore, drop leading/trailing underscores. Returns None if
-    the result is empty or trivially short.
-    """
-    raw_str = _coerce_str(raw)
-    if not raw_str:
-        return None
-    s = raw_str.strip().lower()
-    s = _PAREN_RE.sub(" ", s)
-    s = _NONWORD_RE.sub("_", s).strip("_")
-    if not s or len(s) < 2:
-        return None
-    # Cap segment length so weird LLM outputs don't blow up the tree.
-    if len(s) > 60:
-        s = s[:60].rstrip("_")
-    return s
-
-
-def _display_name(raw, normalized: str) -> str:
-    raw_str = _coerce_str(raw)
-    if raw_str and len(raw_str) <= 80:
-        return raw_str.strip()
-    return normalized.replace("_", " ").title()
-
-
 def _has_value_signal(d: dict) -> bool:
     """Does this claim carry an explicit numeric signal?"""
     for k in ("value", "values", "magnitude", "quantity",
@@ -233,24 +143,17 @@ def _has_value_signal(d: dict) -> bool:
 
 
 def derive_by_data_path(d: dict) -> tuple[list[str], str | None] | None:
-    """Compute the [L1, L2] path + display name for L2.
+    """Compute the canonical [L1, L2, L3] path and leaf display name.
 
-    Returns (path, l2_display_name) on success, or None if the claim is
+    Returns (path, leaf_display_name) on success, or None if the claim is
     not eligible for by_data.
     """
     claim_type = d.get("claim_type") or ""
     if claim_type not in ALWAYS_INSPECT_TYPES and not _has_value_signal(d):
         return None
 
-    raw_cat = d.get("property_category")
     raw_name = d.get("property_name")
-
-    cat = _normalize_category(raw_cat, claim_type)
-    if not cat:
-        return None
-
-    name = _normalize_measurement_name(raw_name)
-    if not name:
+    if not _coerce_str(raw_name):
         # Stricter fallback: only allow it for claim_types that almost
         # always carry a real measurement (and require an explicit
         # `value` field — narrative quotes alone don't count). We use
@@ -263,13 +166,21 @@ def derive_by_data_path(d: dict) -> tuple[list[str], str | None] | None:
         if not d.get("value"):
             return None
         subj = _coerce_str(d.get("subject"))
-        name = (_normalize_measurement_name(subj)
-                or _normalize_measurement_name(claim_type))
-        if not name:
+        if not subj:
             return None
-        return [cat, name], _display_name(subj, name)
+        signature = canonicalize_measurement(
+            subj, d.get("property_category") or claim_type
+        )
+    else:
+        signature = canonicalize_measurement(d)
 
-    return [cat, name], _display_name(raw_name, name)
+    if signature is None:
+        return None
+    # Unsupported open-vocabulary labels are retained on the claim and can be
+    # audited, but they must not recreate the 197k-node public string zoo.
+    if signature.quarantined:
+        return None
+    return list(signature.path), signature.display
 
 
 # ─────────────────────────── DB plumbing ────────────────────────────
@@ -379,9 +290,10 @@ def cmd_apply(args):
     n_updated = 0
     n_skipped = 0
     cat_counts: Counter = Counter()
-    pair_counts: Counter = Counter()
-    pair_display: dict[tuple[str, str], str] = {}
-    pair_claim_ids: dict[tuple[str, str], list[str]] = {}
+    metric_counts: Counter = Counter()
+    leaf_counts: Counter = Counter()
+    leaf_display: dict[tuple[str, str, str], str] = {}
+    leaf_claim_ids: dict[tuple[str, str, str], list[str]] = {}
     t0 = time.monotonic()
 
     BATCH = 5000
@@ -405,6 +317,39 @@ def cmd_apply(args):
             continue
         out = derive_by_data_path(d)
         if not out:
+            # Remove placements created by the legacy open-vocabulary Data
+            # tree while preserving the raw label for later registry review.
+            try:
+                vp_col = (
+                    json.loads(row["view_paths"]) if row["view_paths"] else {}
+                )
+            except Exception:
+                vp_col = {}
+            if not isinstance(vp_col, dict):
+                vp_col = {}
+            d_vp = d.get("view_paths") or {}
+            if not isinstance(d_vp, dict):
+                d_vp = {}
+            had_assignment = (
+                vp_col.pop(VIEW_ID, None) is not None
+                or d_vp.pop(VIEW_ID, None) is not None
+            )
+            if had_assignment:
+                d["view_paths"] = d_vp
+                d["measurement_quarantine"] = {
+                    "property_name": _coerce_str(d.get("property_name")),
+                    "reason": "unsupported_canonical_metric",
+                }
+                d.pop("measurement_signature", None)
+                pending.append((
+                    json.dumps(vp_col, separators=(",", ":")),
+                    json.dumps(d, separators=(",", ":"), ensure_ascii=False),
+                    cid,
+                ))
+                n_updated += 1
+                if len(pending) >= BATCH:
+                    _flush(conn, pending)
+                    pending = []
             continue
         path, display = out
 
@@ -423,6 +368,16 @@ def cmd_apply(args):
             d_vp = {}
         d_vp["by_data"] = path
         d["view_paths"] = d_vp
+        signature = canonicalize_measurement(d)
+        if signature is not None:
+            d["measurement_signature"] = {
+                "id": signature.stable_id,
+                "category": signature.category,
+                "metric": signature.metric,
+                "context": signature.context,
+                "display": signature.display,
+                "quarantined": signature.quarantined,
+            }
 
         pending.append((
             json.dumps(vp_col, separators=(",", ":")),
@@ -430,10 +385,12 @@ def cmd_apply(args):
             cid,
         ))
         cat_counts[path[0]] += 1
-        pair_counts[(path[0], path[1])] += 1
-        pair_display[(path[0], path[1])] = display
+        metric_counts[(path[0], path[1])] += 1
+        leaf_key = (path[0], path[1], path[2])
+        leaf_counts[leaf_key] += 1
+        leaf_display[leaf_key] = display
         # Record up to MAX_LEAF_IDS claim_ids per leaf for tree_nodes.claim_ids
-        ids = pair_claim_ids.setdefault((path[0], path[1]), [])
+        ids = leaf_claim_ids.setdefault(leaf_key, [])
         if len(ids) < args.max_leaf_ids:
             ids.append(cid)
         n_updated += 1
@@ -456,12 +413,16 @@ def cmd_apply(args):
     print(f"  Scanned: {n_seen:,}    Updated: {n_updated:,}    "
           f"Skipped(parse): {n_skipped:,}")
     print(f"  L1 categories: {len(cat_counts)}    "
-          f"L2 leaves: {len(pair_counts):,}")
+          f"L2 metrics: {len(metric_counts):,}    "
+          f"L3 leaves: {len(leaf_counts):,}")
 
     print()
     print("=== Pass 2: building tree_nodes / views ===")
-    _rebuild_tree_nodes(conn, cat_counts, pair_counts,
-                        pair_display, pair_claim_ids)
+    _rebuild_tree_nodes(
+        conn, cat_counts, metric_counts, leaf_counts,
+        leaf_display, leaf_claim_ids,
+    )
+    _rebuild_claim_view_map(conn)
     _upsert_view_row(conn)
     conn.commit()
     print("Done.")
@@ -477,22 +438,57 @@ def _flush(conn: sqlite3.Connection,
     conn.commit()
 
 
+def _rebuild_claim_view_map(conn: sqlite3.Connection) -> None:
+    """Replace denormalized lookup rows for the canonical Data view."""
+    conn.execute("DELETE FROM claim_view_map WHERE view_id = ?", [VIEW_ID])
+    rows: list[tuple[str, str, str]] = []
+    inserted = 0
+    cursor = conn.execute(
+        "SELECT claim_id, view_paths FROM claims "
+        "WHERE view_paths LIKE '%\"by_data\"%'"
+    )
+    for claim_id, raw_paths in cursor:
+        try:
+            path = json.loads(raw_paths or "{}").get(VIEW_ID)
+        except (json.JSONDecodeError, AttributeError):
+            continue
+        if not isinstance(path, list) or not path:
+            continue
+        for depth in range(1, len(path) + 1):
+            rows.append((claim_id, VIEW_ID, "/".join(path[:depth])))
+        if len(rows) >= 5000:
+            conn.executemany(
+                "INSERT OR IGNORE INTO claim_view_map "
+                "(claim_id, view_id, path) VALUES (?, ?, ?)",
+                rows,
+            )
+            inserted += len(rows)
+            rows = []
+    if rows:
+        conn.executemany(
+            "INSERT OR IGNORE INTO claim_view_map "
+            "(claim_id, view_id, path) VALUES (?, ?, ?)",
+            rows,
+        )
+        inserted += len(rows)
+    print(f"  claim_view_map: rebuilt {inserted:,} Data rows")
+
+
 def _build_top_children_for_l1(
     cat: str,
-    pair_counts: Counter,
-    pair_display: dict,
+    metric_counts: Counter,
 ) -> list[dict]:
-    """Pick the top-N L2 measurements (by claim_count) under L1 ``cat``.
+    """Pick the top-N canonical L2 metrics under L1 ``cat``.
 
     Stored inside the L1 row's ``data`` JSON as ``top_children`` so the API
     can serve a subcategory grid in one DB read instead of fetching tens of
     thousands of L2 metadata rows on every page load.
     """
     top: list[dict] = []
-    for (c, name), count in pair_counts.most_common():
+    for (c, name), count in metric_counts.most_common():
         if c != cat:
             continue
-        display = pair_display.get((c, name), name.replace("_", " ").title())
+        display = METRIC_DISPLAY.get(name, name.replace("_", " ").title())
         top.append({
             "name": display,
             "path": f"{c}/{name}",
@@ -506,9 +502,10 @@ def _build_top_children_for_l1(
 def _rebuild_tree_nodes(
     conn: sqlite3.Connection,
     cat_counts: Counter,
-    pair_counts: Counter,
-    pair_display: dict,
-    pair_claim_ids: dict,
+    metric_counts: Counter,
+    leaf_counts: Counter,
+    leaf_display: dict,
+    leaf_claim_ids: dict,
 ) -> None:
     cur = conn.cursor()
     # Wipe any existing by_data tree.
@@ -538,10 +535,10 @@ def _rebuild_tree_nodes(
     # L1 nodes — pre-compute top_children so the API never has to
     # materialize the full child list (some L1 holds 50k+ leaves).
     for cat, count in cat_counts.most_common():
-        children = [name for (c, name), _ in pair_counts.most_common()
+        children = [name for (c, name), _ in metric_counts.most_common()
                     if c == cat]
         display = CATEGORY_DISPLAY.get(cat, cat.title())
-        top_children = _build_top_children_for_l1(cat, pair_counts, pair_display)
+        top_children = _build_top_children_for_l1(cat, metric_counts)
         cur.execute(
             "INSERT INTO tree_nodes (view_id,path,name,level,claim_count,"
             "children,claim_ids,data) VALUES (?,?,?,?,?,?,?,?)",
@@ -552,15 +549,57 @@ def _rebuild_tree_nodes(
                          "top_children": top_children})),
         )
 
-    # L2 nodes.
+    # L2 canonical metric nodes.
     rows = []
-    for (cat, name), count in pair_counts.most_common():
+    for (cat, name), count in metric_counts.most_common():
         path = f"{cat}/{name}"
-        display = pair_display.get((cat, name), name.replace("_", " ").title())
-        leaf_ids = pair_claim_ids.get((cat, name), [])
+        display = METRIC_DISPLAY.get(name, name.replace("_", " ").title())
+        children = [
+            context for (c, metric, context), _ in leaf_counts.most_common()
+            if c == cat and metric == name
+        ]
+        top_children = [
+            {
+                "name": leaf_display.get(
+                    (cat, name, context), context.replace("_", " ").title()
+                ),
+                "path": f"{path}/{context}",
+                "claim_count": leaf_counts[(cat, name, context)],
+            }
+            for context in children[:L1_TOP_CHILDREN_N]
+        ]
         rows.append((
             VIEW_ID, path, display, 2, count,
-            json.dumps([]), json.dumps(leaf_ids),
+            json.dumps(children), json.dumps([]),
+            json.dumps({"name": display, "view_id": VIEW_ID,
+                        "claim_count": count,
+                        "top_children": top_children}),
+        ))
+        if len(rows) >= 5000:
+            cur.executemany(
+                "INSERT INTO tree_nodes (view_id,path,name,level,"
+                "claim_count,children,claim_ids,data) "
+                "VALUES (?,?,?,?,?,?,?,?)",
+                rows,
+            )
+            rows = []
+    if rows:
+        cur.executemany(
+            "INSERT INTO tree_nodes (view_id,path,name,level,"
+            "claim_count,children,claim_ids,data) "
+            "VALUES (?,?,?,?,?,?,?,?)",
+            rows,
+        )
+
+    # L3 context leaves own the claim IDs.
+    rows = []
+    for key, count in leaf_counts.most_common():
+        cat, name, context = key
+        path = f"{cat}/{name}/{context}"
+        display = leaf_display.get(key, context.replace("_", " ").title())
+        rows.append((
+            VIEW_ID, path, display, 3, count,
+            json.dumps([]), json.dumps(leaf_claim_ids.get(key, [])),
             json.dumps({"name": display, "view_id": VIEW_ID,
                         "claim_count": count}),
         ))
@@ -581,8 +620,8 @@ def _rebuild_tree_nodes(
         )
     conn.commit()
     print(f"  tree_nodes: 1 root + {len(cat_counts)} L1 + "
-          f"{len(pair_counts):,} L2  =  "
-          f"{1 + len(cat_counts) + len(pair_counts):,} rows")
+          f"{len(metric_counts):,} L2 + {len(leaf_counts):,} L3 = "
+          f"{1 + len(cat_counts) + len(metric_counts) + len(leaf_counts):,} rows")
 
 
 def _upsert_view_row(conn: sqlite3.Connection,
@@ -611,7 +650,7 @@ def _upsert_view_row(conn: sqlite3.Connection,
         "root_node_id": "",
         "node_count": node_count,
         "claim_count": claim_count,
-        "max_depth": 2,
+        "max_depth": 3,
         "created_at": "",
         "updated_at": "",
     }
@@ -723,9 +762,10 @@ def cmd_rebuild_tree(args):
     """
     conn = _open_rw()
     cat_counts: Counter = Counter()
-    pair_counts: Counter = Counter()
-    pair_display: dict[tuple[str, str], str] = {}
-    pair_claim_ids: dict[tuple[str, str], list[str]] = {}
+    metric_counts: Counter = Counter()
+    leaf_counts: Counter = Counter()
+    leaf_display: dict[tuple[str, str, str], str] = {}
+    leaf_claim_ids: dict[tuple[str, str, str], list[str]] = {}
     t0 = time.monotonic()
     n = 0
     for row in conn.execute(
@@ -738,26 +778,36 @@ def cmd_rebuild_tree(args):
             path = vp.get("by_data")
         except Exception:
             continue
-        if not path or len(path) < 2:
+        if not path or len(path) < 3:
             continue
-        cat, name = path[0], path[1]
+        cat, name, context = path[:3]
+        key = (cat, name, context)
         cat_counts[cat] += 1
-        pair_counts[(cat, name)] += 1
-        if (cat, name) not in pair_display:
+        metric_counts[(cat, name)] += 1
+        leaf_counts[key] += 1
+        if key not in leaf_display:
             try:
                 d = json.loads(row["data"])
-                raw_name = d.get("property_name")
-                pair_display[(cat, name)] = _display_name(raw_name, name)
+                signature = canonicalize_measurement(d)
+                leaf_display[key] = (
+                    signature.display if signature else
+                    METRIC_DISPLAY.get(name, name.replace("_", " ").title())
+                )
             except Exception:
-                pair_display[(cat, name)] = name.replace("_", " ").title()
-        ids = pair_claim_ids.setdefault((cat, name), [])
+                leaf_display[key] = METRIC_DISPLAY.get(
+                    name, name.replace("_", " ").title()
+                )
+        ids = leaf_claim_ids.setdefault(key, [])
         if len(ids) < args.max_leaf_ids:
             ids.append(row["claim_id"])
         if n % 100000 == 0:
             print(f"  scanned {n:,}  ({time.monotonic()-t0:.1f}s)", flush=True)
     print(f"  scanned {n:,} tagged claims in {time.monotonic()-t0:.1f}s")
-    _rebuild_tree_nodes(conn, cat_counts, pair_counts,
-                        pair_display, pair_claim_ids)
+    _rebuild_tree_nodes(
+        conn, cat_counts, metric_counts, leaf_counts,
+        leaf_display, leaf_claim_ids,
+    )
+    _rebuild_claim_view_map(conn)
     _upsert_view_row(conn)
     conn.commit()
 

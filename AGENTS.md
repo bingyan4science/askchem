@@ -9,7 +9,7 @@ AskChem is a structured chemistry knowledge index with source-grounded, DOI-veri
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/api/search?q={query}&view={view_id}&limit=50` | Hybrid search across all claims (FTS + paper-level + taxonomy + vector, fused via RRF). Optional `view` filters claims to those tagged in the selected hierarchy. |
+| GET | `/api/search?q={query}&view={view_id}&limit=50` | Hybrid claim search with optional taxonomy-view filtering. |
 | GET | `/api/views` | List hierarchical views |
 | GET | `/api/tree/{view_id}/{path}?depth=1` | Browse taxonomy tree |
 | GET | `/api/claims/{claim_id}` | Get full claim details |
@@ -35,8 +35,8 @@ curl -s "https://askchem.org/api/search?q=suzuki+coupling&limit=3" | python -m j
 
 ## Authentication
 
-- **Anonymous:** 60 requests/min
-- **API key:** `Authorization: Bearer ac-...` — 300 requests/min
+- **Anonymous:** 100 requests/minute and 5,000 requests/day
+- **API key:** `Authorization: Bearer ac-...` — tiered higher limits
 - Request a key: `POST /api/keys/request` with `{"name": "...", "email": "...", "use_case": "..."}`
 
 ## Views (hierarchical taxonomies)
@@ -46,8 +46,9 @@ curl -s "https://askchem.org/api/search?q=suzuki+coupling&limit=3" | python -m j
 - `by_technique` — Analytical and experimental methods
 - `by_application` — Application domains
 - `by_mechanism` — Phenomena and mechanisms
+- `by_data` — Canonical measurements and reported values
 - `by_claim_type` — Claim types (experimental, method, property, etc.)
-- `by_author` — Author expertise map
+- `by_time_period` — Publication periods
 
 ## When to use AskChem
 

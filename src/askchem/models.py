@@ -321,8 +321,8 @@ DEFAULT_VIEWS = [
     ),
     View(
         view_id="by_substance_class",
-        name="By Substance/Material Class",
-        description="Organizes claims by the class of molecules or materials involved",
+        name="Substance",
+        description="Organizes claims by chemical substance class",
         organizing_principle="substance_class",
     ),
     View(

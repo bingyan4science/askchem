@@ -5,7 +5,8 @@ services:
     volumes:
       - ./data:/app/data
     environment:
-      - CHEMTREE_DB=/app/data/chemtree.db
+      - ASKCHEM_DB=/app/data/askchem.db
+      - CHEMTREE_DISABLE_PAW=1
     expose:
       - "8080"
 

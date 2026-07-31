@@ -10,10 +10,10 @@ AskChem changes the unit of retrieval from the *paper* to the **provenance-carry
 
 - **2.44M provenance-carrying claims** from **146.6K papers** (1925–2026) — each is a typed assertion with a verbatim quote and source DOI.
 - **Three complementary structures over one shared claim store:**
-  - **Stabilized faceted taxonomy** — corpus-induced, normalized L1/L2/L3 paths exposed as **10 navigational views**: reaction type, substance class, application, technique, mechanism, extracted data, claim type, and time, plus an **author** (coauthor graph) view and a **network** (evidence-graph) view. ~306.9K taxonomy nodes.
+  - **Stabilized faceted taxonomy** — normalized L1/L2/L3 paths for reaction type, substance, application, technique, mechanism, extracted data, and claim type, complemented by temporal, author, and evidence-network navigation.
   - **Evidence graph** — ~171K typed claim-to-claim relations (`supports`, `contradicts`, `extends`, `derives_from`, `cites_as_evidence`); 97.9% edge-type precision on an expert audit.
   - **Living Taxonomy** (exploratory) — a principle-centered hierarchy (principles → theories → models → mechanisms → phenomena) that situates paper-grounded claims under the scientific ideas that govern them. Currently situates ~1M+ claims across the reaction, substance, technique, and mechanism views.
-- **Hybrid search** — FTS5 full-text + paper-level recall + taxonomy-node recall + dense vectors, fused via reciprocal rank fusion (RRF), with cross-encoder reranking.
+- **Configurable hybrid search** — FTS5 and dense-vector retrieval fused via reciprocal rank fusion (RRF), with cross-encoder reranking and optional paper, taxonomy, and author recall channels.
 - **Temporal tracking** — see how any topic has evolved year by year.
 - **Access everywhere** — Web UI, REST API (OpenAPI), Python SDK (`pip install askchem`), and an **MCP server** for AI agents.
 - **AskChem-Bench** — a cross-paper chemistry search evaluation measuring citation groundedness and relevance.
@@ -84,7 +84,7 @@ src/askchem/             # Core library (FastAPI app + retrieval + serving)
   embeddings.py / embeddings_v2.py   # Dense claim embeddings + FAISS index
   ltree.py               # Living Taxonomy serving (nodes, paths, semantic routing)
   advisor.py             # Paper intelligence (critique / contribution / advisor)
-  taxonomy.py / canonical_l3.py       # Canonical faceted taxonomy (L1/L2/L3)
+  taxonomy.py / taxonomy_v2.json      # Canonical faceted taxonomy (L1/L2/L3)
   models.py              # Data models (Claim, Source, TreeNode, View, ...)
   indexer.py             # Claim classification + tree building
   mcp_server.py          # Model Context Protocol server for AI agents
@@ -109,7 +109,7 @@ sdk/                     # Python SDK (pip install askchem)
 web/                     # Single-page web application
 scripts/                 # Figures, benchmarks, and one-off utilities
 tests/                   # Test suite
-deploy/  docs/           # Deployment configs and documentation
+docs/                    # Architecture notes and documentation
 ```
 
 ## Deployment (askchem.org)
@@ -128,20 +128,21 @@ git clone https://github.com/bingyan4science/askchem.git /opt/askchem
 cd /opt/askchem
 
 # 2. Fetch the database (SQLite + FTS5 + baked-in taxonomy)
-huggingface-cli download bing-yan/askchem askchem.db --local-dir .
+mkdir -p data
+huggingface-cli download bing-yan/askchem askchem.db --local-dir data
 
 # 3. Launch (Caddy handles HTTPS automatically)
 docker compose up -d
 ```
 
-Caddy will automatically obtain a Let's Encrypt certificate for `askchem.org` and serve the site over HTTPS. (`deploy_to_vps.sh` automates a full server deploy; set `VPS` to your own host — the released copy uses a `YOUR_VPS_HOST` placeholder.)
+Caddy automatically obtains a Let's Encrypt certificate for `askchem.org` and serves the site over HTTPS.
 
 ### Local Development
 
 ```bash
 pip install -r requirements.txt
 
-# Place askchem.db in the repo root (see step 2 above), then:
+# Place `askchem.db` in the repository root, then:
 cd src && uvicorn askchem.server:app --host 0.0.0.0 --port 8420 --reload
 # Open http://localhost:8420
 ```
@@ -150,7 +151,7 @@ cd src && uvicorn askchem.server:app --host 0.0.0.0 --port 8420 --reload
 
 | Endpoint | Description |
 |----------|-------------|
-| `GET /api/search?q=...&view=...` | Hybrid search (FTS + paper-level + taxonomy + vector, fused via RRF). Optional `view` restricts to a facet. |
+| `GET /api/search?q=...&view=...` | Hybrid claim search with optional view filtering. |
 | `GET /api/views` | List all hierarchical views |
 | `GET /api/tree/{view_id}?depth=N` / `GET /api/tree/{view_id}/{path}` | Browse a faceted view / node |
 | `GET /api/temporal/{view_id}/{path}` | Year-by-year breakdown at a node |
@@ -167,7 +168,7 @@ cd src && uvicorn askchem.server:app --host 0.0.0.0 --port 8420 --reload
 | `POST /api/submit` · `POST /api/flag` | Submit a paper / flag a claim |
 | `GET /api/docs` | Interactive OpenAPI documentation |
 
-Anonymous access is rate-limited to 60 requests/min; an API key (`Authorization: Bearer ac-...`) raises it to 300/min. All endpoints are also available under `/v1/` with key authentication.
+Anonymous access is rate-limited to 100 requests/minute and 5,000 requests/day. API keys (`Authorization: Bearer ac-...`) receive tiered higher limits. All endpoints are also available under `/v1/`.
 
 ## Links
 

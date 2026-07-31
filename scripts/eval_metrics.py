@@ -108,7 +108,14 @@ def run_live(probes, top_k: int) -> dict[str, list[str]]:
     for i, probe in enumerate(probes, 1):
         t0 = time.monotonic()
         try:
-            res = search_claims(probe.q, limit=top_k)
+            res = search_claims(
+                probe.q,
+                claim_type=probe.claim_type,
+                view=probe.view,
+                limit=top_k,
+                mode=probe.mode,
+                sort=probe.sort,
+            )
         except Exception as e:
             print(f"  [{i}/{len(probes)}] {probe.id}  ERROR: {e!r}",
                   file=sys.stderr)
@@ -243,6 +250,7 @@ def main():
     p.add_argument("--rankings",
                    help="precomputed rankings JSONL "
                         "(default: run search_claims live)")
+    p.add_argument("--probes", type=Path, default=PROBES_PATH)
     p.add_argument("--top-k", type=int, default=20)
     p.add_argument("--compare", nargs=2, metavar=("BASE", "NEW"),
                    help="diff two saved runs by label")
@@ -269,7 +277,7 @@ def main():
         print("ERROR: --run is required", file=sys.stderr)
         sys.exit(1)
 
-    probes = load_probes(PROBES_PATH)
+    probes = load_probes(args.probes)
     judgments = load_judgments()
     if not judgments:
         print(f"ERROR: no judgments at {LABELS_PATH}", file=sys.stderr)

@@ -74,7 +74,9 @@ def rank_of(claim_id: str, ranking: list[str]) -> int | None:
 
 def attribute_probe(probe_id: str, query: str, family: str,
                     judgments: dict[str, int],
-                    top_k: int = 20) -> dict:
+                    top_k: int = 20, view: str | None = None,
+                    claim_type: str | None = None, mode: str = "auto",
+                    sort: str = "relevance") -> dict:
     """Run one probe through the instrumented pipeline.
 
     Returns the attribution dict. Stages are recorded by claim-id list
@@ -83,7 +85,10 @@ def attribute_probe(probe_id: str, query: str, family: str,
     trace: dict = {}
     t0 = time.monotonic()
     try:
-        result = db.search_claims(query, limit=top_k, _trace_into=trace)
+        result = db.search_claims(
+            query, claim_type=claim_type, view=view, limit=top_k,
+            mode=mode, sort=sort, _trace_into=trace,
+        )
     except Exception as exc:
         return {
             "probe_id": probe_id, "family": family, "query": query,
@@ -97,6 +102,9 @@ def attribute_probe(probe_id: str, query: str, family: str,
 
     fts_pool = trace.get("fts_pool", [])
     vec_pool = trace.get("vector_pool", [])
+    tree_pool = trace.get("tree_pool", [])
+    paper_pool = trace.get("paper_pool", [])
+    author_pool = trace.get("author_pool", [])
     rrf_pool = trace.get("rrf_pool", [])
     rerank_input = trace.get("rerank_input", [])
     rerank_output = trace.get("rerank_output", [])
@@ -113,6 +121,9 @@ def attribute_probe(probe_id: str, query: str, family: str,
 
     fts_ranks = _ranks(fts_pool)
     vec_ranks = _ranks(vec_pool)
+    tree_ranks = _ranks(tree_pool)
+    paper_ranks = _ranks(paper_pool)
+    author_ranks = _ranks(author_pool)
     rrf_ranks = _ranks(rrf_pool)
     rerank_ranks = _ranks(rerank_output) if rerank_output else _ranks(rerank_input)
     final_ranks = _ranks(final_top)
@@ -128,13 +139,15 @@ def attribute_probe(probe_id: str, query: str, family: str,
 
     best_final = _best(final_ranks)
     best_rrf = _best(rrf_ranks)
-    best_fts_or_vec = _best({**fts_ranks, **vec_ranks})
+    best_recall = _best({
+        **fts_ranks, **vec_ranks, **tree_ranks, **paper_ranks, **author_ranks,
+    })
 
     if not judged_pos:
         category = "no_relevant"
     elif best_final is not None and best_final < 10:
         category = "unaffected"
-    elif best_rrf is None and best_fts_or_vec is None:
+    elif best_rrf is None and best_recall is None:
         category = "recall_bounded"
     elif best_final is None or best_final >= 10:
         if best_rrf is not None and best_rrf < 50:
@@ -148,12 +161,19 @@ def attribute_probe(probe_id: str, query: str, family: str,
         "probe_id": probe_id,
         "family": family,
         "query": query,
+        "view": view,
+        "claim_type": claim_type,
+        "mode": mode,
+        "sort": sort,
         "latency_ms": elapsed_ms,
         "n_judged_pos": len(judged_pos),
         "n_judged_high": len(judged_high),
         "pool_sizes": {
             "fts": len(fts_pool),
             "vector": len(vec_pool),
+            "tree": len(tree_pool),
+            "paper": len(paper_pool),
+            "author": len(author_pool),
             "rrf": len(rrf_pool),
             "rerank_in": len(rerank_input),
             "rerank_out": len(rerank_output),
@@ -162,12 +182,20 @@ def attribute_probe(probe_id: str, query: str, family: str,
         "best_rank": {
             "fts": _best(fts_ranks),
             "vector": _best(vec_ranks),
+            "tree": _best(tree_ranks),
+            "paper": _best(paper_ranks),
+            "author": _best(author_ranks),
             "rrf": _best(rrf_ranks),
             "rerank": _best(rerank_ranks),
             "final": best_final,
         },
         "category": category,
         "query_variants": trace.get("query_variants", []),
+        "paper_doi_count": trace.get("paper_doi_count", 0),
+        "paper_claims_loaded": trace.get("paper_claims_loaded", 0),
+        "timings": trace.get("timings", []),
+        "counts": trace.get("counts", {}),
+        "experiment_config": trace.get("experiment_config", {}),
         "rerank_query": trace.get("rerank_query"),
         # Full top-K so scripts/eval_metrics.py can score nDCG@10
         # directly from this same JSONL.
@@ -191,6 +219,14 @@ def main() -> int:
             "CHEMTREE_RERANK_WINDOW", "CHEMTREE_RETRIEVER_VERSION",
             "CHEMTREE_V2_DIM", "CHEMTREE_RERANK_ENABLED",
             "CHEMTREE_DISABLE_PRF", "CHEMTREE_DISABLE_TREE_RERANK",
+            "CHEMTREE_DISABLE_TREE_RECALL",
+            "CHEMTREE_DISABLE_AUTHOR_RECALL",
+            "CHEMTREE_DISABLE_SOURCE_PAPER_RECALL",
+            "CHEMTREE_DISABLE_CLAIM_GUIDED_PAPER_RECALL",
+            "CHEMTREE_DISABLE_FTS", "CHEMTREE_DISABLE_DENSE",
+            "CHEMTREE_DISABLE_CITATION_BOOST",
+            "CHEMTREE_DISABLE_RERANK",
+            "CHEMTREE_MAX_QUERY_VARIANTS",
         )
     }
     print(f"=== eval_search_attribution: {args.label} ===")
@@ -224,6 +260,8 @@ def main() -> int:
             judg = relevance.get(pr.id, {})
             row = attribute_probe(
                 pr.id, pr.q, pr.family, judg, top_k=args.top,
+                view=pr.view, claim_type=pr.claim_type,
+                mode=pr.mode, sort=pr.sort,
             )
             cat_counts[row.get("category", "error")] += 1
             rows.append(row)

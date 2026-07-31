@@ -31,6 +31,7 @@ from pydantic import BaseModel
 from . import db
 from . import ltree
 from . import advisor
+from .taxonomy_aliases import resolve_tree_path
 
 ADMIN_TOKEN = os.environ.get("ADMIN_TOKEN", "")
 
@@ -154,10 +155,28 @@ async def lifespan(app):
             db._load_tree_node_index()
         except Exception:
             pass
+        # Exercise the complete retrieval path before the process becomes
+        # ready. Component warmups above do not populate query-variant,
+        # paper-recall, candidate-hydration, reranker, or search-result caches.
+        # Calling the DB layer directly avoids writing synthetic query_log rows.
+        if os.environ.get("CHEMTREE_E2E_WARMUP", "") == "1":
+            for probe in (
+                "Suzuki coupling",
+                "powder X-ray diffraction",
+                "metal organic framework",
+            ):
+                try:
+                    db.search_claims(probe, limit=50)
+                except Exception as exc:
+                    print(
+                        f"end-to-end search warmup skipped for {probe!r}: {exc}",
+                        flush=True,
+                    )
     except Exception:
         pass
     import threading
-    threading.Thread(target=_warmup_paw, daemon=True).start()
+    if os.environ.get("ASKCHEM_DISABLE_PAW_WARMUP", "0") != "1":
+        threading.Thread(target=_warmup_paw, daemon=True).start()
     yield
 
 
@@ -996,6 +1015,8 @@ def api_tree_node(
     Path is slash-separated, e.g. `/api/tree/by_reaction_type/catalysis/heterogeneous`.
     Paginate claims with `limit` and `offset`.
     """
+    requested_path = path
+    path, aliased = resolve_tree_path(view_id, path)
     tree = db.get_tree_with_depth(view_id, path, depth)
     if not tree:
         raise HTTPException(404, f"Node not found: {view_id}/{path}")
@@ -1010,6 +1031,9 @@ def api_tree_node(
         "limit": limit,
         "offset": offset,
     }
+    if aliased:
+        resp["requested_path"] = requested_path
+        resp["canonical_path"] = path
     if "children_summary" in result:
         resp["children_summary"] = result["children_summary"]
     return resp
@@ -1271,7 +1295,14 @@ def api_temporal_overlay(view_id: str, path: str):
 
     **Agent usage:** `GET /api/temporal/by_reaction_type/catalysis/cross_coupling`
     """
-    return db.get_temporal_overlay(view_id, path)
+    requested_path = path
+    path, aliased = resolve_tree_path(view_id, path)
+    result = db.get_temporal_overlay(view_id, path)
+    if aliased and isinstance(result, dict):
+        result = dict(result)
+        result["requested_path"] = requested_path
+        result["canonical_path"] = path
+    return result
 
 
 @app.get("/api/evolution/{view_id}/{path:path}", summary="Evolution timeline")
@@ -1284,7 +1315,14 @@ def api_evolution(view_id: str, path: str):
 
     **Agent usage:** `GET /api/evolution/by_reaction_type/catalysis/cross_coupling`
     """
-    return db.get_evolution_timeline(view_id, path)
+    requested_path = path
+    path, aliased = resolve_tree_path(view_id, path)
+    result = db.get_evolution_timeline(view_id, path)
+    if aliased and isinstance(result, dict):
+        result = dict(result)
+        result["requested_path"] = requested_path
+        result["canonical_path"] = path
+    return result
 
 
 # ── Reading List ─────────────────────────────────────────────────────────────
@@ -1303,9 +1341,15 @@ def api_reading_list(
 
     **Agent usage:** `GET /api/reading-list/by_reaction_type/catalysis/cross_coupling`
     """
+    requested_path = path
+    path, aliased = resolve_tree_path(view_id, path)
     result = db.get_reading_list(view_id, path, limit=limit)
     if result["total_papers"] == 0:
         raise HTTPException(404, f"No papers found for {view_id}/{path}")
+    if aliased:
+        result = dict(result)
+        result["requested_path"] = requested_path
+        result["canonical_path"] = path
     return result
 
 
@@ -1926,7 +1970,16 @@ def api_contradictions_node(view_id: str, path: str, limit: int = Query(20, ge=1
     """
     Return pre-computed contradictions at or below a specific tree node.
     """
-    return db.get_contradictions(view_id=view_id, node_path=path, limit=limit)
+    requested_path = path
+    path, aliased = resolve_tree_path(view_id, path)
+    result = db.get_contradictions(
+        view_id=view_id, node_path=path, limit=limit,
+    )
+    if aliased and isinstance(result, dict):
+        result = dict(result)
+        result["requested_path"] = requested_path
+        result["canonical_path"] = path
+    return result
 
 
 # ── Community Flagging ────────────────────────────────────────────────────────
@@ -2172,7 +2225,7 @@ def api_edges(
 @app.get("/api/claims/{claim_id}/neighborhood", summary="Inbound and outbound edges around a claim")
 def api_claim_neighborhood(
     claim_id: str,
-    direction: str = Query("both", regex="^(in|out|both)$"),
+    direction: str = Query("both", pattern="^(in|out|both)$"),
     edge_types: Optional[str] = Query(None, description="Comma-separated edge type filter"),
     depth: int = Query(1, ge=1, le=2),
     limit: int = Query(100, ge=1, le=500),
@@ -2275,7 +2328,7 @@ def api_search_graph(
     ),
     limit: int = Query(50, ge=1, le=500, description="Top-N search hits to draw the subgraph over"),
     offset: int = Query(0, ge=0, description="Skip the first N hits (mirrors /api/search pagination)"),
-    expand: str = Query("bridges", regex="^(strict|bridges|one_hop)$"),
+    expand: str = Query("bridges", pattern="^(strict|bridges|one_hop)$"),
 ):
     """Return the typed-edge subgraph induced by a set of anchor claims.
 
@@ -3372,7 +3425,16 @@ def v1_search(
     limit: int = Query(50, ge=1, le=500),
     offset: int = Query(0, ge=0),
 ):
-    return api_search(request=request, q=q, claim_type=claim_type, view=view, limit=limit, offset=offset)
+    return api_search(
+        request=request,
+        q=q,
+        claim_type=claim_type,
+        view=view,
+        limit=limit,
+        offset=offset,
+        mode="auto",
+        sort="relevance",
+    )
 
 
 @app.get("/v1/claims/{claim_id}", summary="[v1] Get claim")

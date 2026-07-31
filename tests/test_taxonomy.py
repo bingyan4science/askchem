@@ -16,7 +16,7 @@ from askchem.taxonomy import (
 
 
 class TestCanonicalL1:
-    def test_all_five_views_present(self):
+    def test_all_content_views_present(self):
         expected = {
             "by_reaction_type", "by_substance_class",
             "by_technique", "by_application", "by_mechanism",
@@ -100,6 +100,13 @@ class TestNormalizePath:
         result = normalize_path("by_unknown_view", ["anything", "goes"])
         assert result is not None
         assert result[0] == "anything"
+
+    def test_legacy_alias_is_resolved_before_validation(self):
+        result = normalize_path(
+            "by_reaction_type",
+            ["coupling", "cross_coupling", "suzuki_coupling"],
+        )
+        assert result == ["coupling", "cross_coupling", "suzuki_miyaura"]
 
 
 class TestBuildClaimTypePath:

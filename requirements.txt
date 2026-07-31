@@ -4,7 +4,6 @@ openai>=1.50.0
 requests>=2.31.0
 pydantic>=2.0.0
 rdkit>=2024.3.1
-programasweights>=0.1.0.dev6
 PyJWT[crypto]>=2.8.0
 
 # v2 retrieval stack (δ3 ship-to-prod, May 11). Required by

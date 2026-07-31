@@ -155,8 +155,10 @@ class AskChem:
     AskChem API client.
 
     Args:
-        api_key: API key for authentication. Falls back to CHEMTREE_API_KEY env var.
-        base_url: Base URL of the AskChem API. Falls back to CHEMTREE_BASE_URL env var.
+        api_key: API key for authentication. Falls back to ASKCHEM_API_KEY
+            (or the legacy CHEMTREE_API_KEY) environment variable.
+        base_url: Base URL of the AskChem API. Falls back to ASKCHEM_BASE_URL
+            (or the legacy CHEMTREE_BASE_URL) environment variable.
         timeout: Request timeout in seconds.
         max_retries: Max retry attempts for transient errors (429, 5xx).
     """
@@ -168,16 +170,21 @@ class AskChem:
         timeout: float = DEFAULT_TIMEOUT,
         max_retries: int = MAX_RETRIES,
     ):
-        self.api_key = api_key or os.environ.get("CHEMTREE_API_KEY", "")
+        self.api_key = (
+            api_key
+            or os.environ.get("ASKCHEM_API_KEY", "")
+            or os.environ.get("CHEMTREE_API_KEY", "")
+        )
         self.base_url = (
             base_url
+            or os.environ.get("ASKCHEM_BASE_URL", "")
             or os.environ.get("CHEMTREE_BASE_URL", "")
             or DEFAULT_BASE_URL
         ).rstrip("/")
         self.timeout = timeout
         self.max_retries = max_retries
 
-        headers = {"User-Agent": "askchem-python/0.2.0"}
+        headers = {"User-Agent": "askchem-python/0.3.0"}
         if self.api_key:
             headers["Authorization"] = f"Bearer {self.api_key}"
 

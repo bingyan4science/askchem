@@ -11,6 +11,10 @@ L2: fixed subcategories under each L1 (claim must match exactly one)
 L3: canonical subcategories for large L2 nodes (>= 5K claims); defined in canonical_l3.py
 """
 
+import json
+import os
+from pathlib import Path
+
 from askchem.canonical_l3 import CANONICAL_L3
 
 # ── L1 definitions ───────────────────────────────────────────────────────────
@@ -530,6 +534,27 @@ CLAIM_TYPE_LABELS = {
     "surprising_finding": "surprising_finding",
 }
 
+_TAXONOMY_V2_PATH = Path(
+    os.environ.get(
+        "ASKCHEM_TAXONOMY_PATH",
+        Path(__file__).with_name("taxonomy_v2.json"),
+    )
+)
+TAXONOMY_VERSION = "v1"
+if (_TAXONOMY_V2_PATH.exists()
+        and os.environ.get("ASKCHEM_DISABLE_TAXONOMY_V2", "0") != "1"):
+    _v2 = json.loads(_TAXONOMY_V2_PATH.read_text())
+    TAXONOMY_VERSION = _v2["taxonomy_version"]
+    CANONICAL_L1 = _v2["canonical_l1"]
+    CANONICAL_L2 = _v2["canonical_l2"]
+    CANONICAL_L3 = {
+        view: {
+            tuple(path.split("/", 1)): values
+            for path, values in parents.items()
+        }
+        for view, parents in _v2["canonical_l3"].items()
+    }
+
 ALL_CONTENT_VIEWS = list(CANONICAL_L1.keys())
 
 
@@ -566,8 +591,13 @@ _TAXONOMY_TEXT = _build_taxonomy_text()
 _FULL_TAXONOMY_TEXT = _build_full_taxonomy_text()
 
 
+def _return_shape(full: bool = False) -> str:
+    path = ["l1", "l2", "l3"] if full else ["l1", "l2"]
+    return json.dumps({view: path for view in ALL_CONTENT_VIEWS})
+
+
 # Two-step prompts (for batch reclassification of existing claims)
-CLASSIFICATION_SYSTEM_PROMPT = f"""Classify chemistry claims into 5 hierarchical views.
+CLASSIFICATION_SYSTEM_PROMPT = f"""Classify chemistry claims into each listed hierarchical view.
 
 Rules:
 - L1 MUST be one of the listed categories (exactly one per view).
@@ -579,7 +609,8 @@ Rules:
 Canonical categories (L1 → allowed L2):
 {_TAXONOMY_TEXT}
 
-Return JSON: {{"by_reaction_type": ["l1", "l2"], "by_substance_class": ["l1", "l2"], "by_application": ["l1", "l2"], "by_technique": ["l1", "l2"], "by_mechanism": ["l1", "l2"]}}"""
+Return JSON with exactly these view keys and path shape:
+{_return_shape()}"""
 
 
 L3_ASSIGNMENT_SYSTEM_PROMPT = """Assign L3 subcategories to a chemistry claim that has already been classified at L1/L2.
@@ -591,7 +622,7 @@ Return JSON with the same keys, each value being the chosen L3 string."""
 
 
 # Single-call prompt (for new individual claims — includes L3 in one shot)
-FULL_CLASSIFICATION_SYSTEM_PROMPT = f"""Classify chemistry claims into 5 hierarchical views.
+FULL_CLASSIFICATION_SYSTEM_PROMPT = f"""Classify chemistry claims into each listed hierarchical view.
 
 Rules:
 - L1 MUST be one of the listed categories (exactly one per view).
@@ -603,7 +634,8 @@ Rules:
 Canonical categories (L1 → L2, and L2 → L3 where defined):
 {_FULL_TAXONOMY_TEXT}
 
-Return JSON: {{"by_reaction_type": ["l1", "l2"] or ["l1", "l2", "l3"], "by_substance_class": [...], "by_application": [...], "by_technique": [...], "by_mechanism": [...]}}"""
+Return JSON with exactly these view keys and paths of two or three segments:
+{_return_shape(full=True)}"""
 
 
 def build_classification_prompt(claim_type: str, quote: str, title: str) -> str:
@@ -678,6 +710,12 @@ def normalize_path(view_id: str, path: list):
 
     if not cleaned:
         return None
+
+    # Resolve legacy/free-form aliases before validating canonical IDs.  This
+    # prevents ingestion from recreating a deprecated taxonomy node.
+    from askchem.taxonomy_aliases import resolve_tree_path
+    resolved, _ = resolve_tree_path(view_id, "/".join(cleaned))
+    cleaned = resolved.split("/") if resolved else []
 
     # Validate L1
     canonical_l1 = set(CANONICAL_L1.get(view_id, []))

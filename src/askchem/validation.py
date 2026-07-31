@@ -40,22 +40,14 @@ VALID_PAPER_LOCATIONS = frozenset({
     "abstract", "introduction", "results", "discussion", "methods",
     "experimental", "conclusion", "supporting_information", "supplementary",
 })
+GENERATED_VIEWS = frozenset({
+    "by_claim_type", "by_data", "by_time_period", "by_author",
+    "by_journal", "by_institution", "by_year",
+})
 
-TYPE_REQUIRED_FIELDS: dict[str, list[str]] = {
-    "reaction": ["verbatim_quote"],
-    "scope_entry": ["verbatim_quote"],
-    "property": ["verbatim_quote"],
-    "structure": ["verbatim_quote"],
-    "method": ["verbatim_quote"],
-    "mechanism": ["verbatim_quote"],
-    "comparison": ["verbatim_quote"],
-    "computational_result": ["verbatim_quote"],
-    "hypothesis": ["verbatim_quote"],
-    "experimental_design": ["verbatim_quote"],
-    "limitation": ["verbatim_quote"],
-    "future_direction": ["verbatim_quote"],
-    "surprising_finding": ["verbatim_quote"],
-}
+# Source grounding (verbatim_quote or evidence_locator) is enforced centrally
+# in validate_claim, so it is not repeated as a per-type required field here.
+TYPE_REQUIRED_FIELDS: dict[str, list[str]] = {}
 
 TYPE_RECOMMENDED_FIELDS: dict[str, list[str]] = {
     "reaction": ["reaction_type"],
@@ -148,10 +140,25 @@ def validate_claim(claim: dict, strict: bool = False) -> ValidationResult:
     if confidence and confidence not in VALID_CONFIDENCE:
         result.add_warning("confidence", f"Non-standard confidence: '{confidence}'")
 
-    # -- Verbatim quote --
+    # -- Source grounding: a verbatim quote OR an explicit evidence locator --
+    # Abstract-derived claims carry a verbatim_quote copied from the source.
+    # Structured full-paper claims (figures/tables) may instead carry an
+    # evidence_locator (location_in_paper plus structured evidence) when no
+    # single contiguous passage is available. Either satisfies grounding.
     quote = claim.get("verbatim_quote", "")
+    locator = claim.get("evidence_locator")
+    has_locator = bool(locator) if not isinstance(locator, str) else bool(locator.strip())
     if not quote:
-        result.add_error("verbatim_quote", "Missing verbatim_quote (source grounding required)")
+        if has_locator:
+            result.add_warning(
+                "verbatim_quote",
+                "No verbatim_quote; grounded by evidence_locator instead",
+            )
+        else:
+            result.add_error(
+                "verbatim_quote",
+                "Missing source grounding (verbatim_quote or evidence_locator required)",
+            )
     elif len(quote) < 10:
         result.add_warning("verbatim_quote", f"Very short quote ({len(quote)} chars)")
 
@@ -183,11 +190,37 @@ def validate_claim(claim: dict, strict: bool = False) -> ValidationResult:
     # -- View paths --
     view_paths = claim.get("view_paths", {})
     if view_paths and isinstance(view_paths, dict):
+        from askchem.taxonomy import ALL_CONTENT_VIEWS, normalize_path
+
         for view_id, path in view_paths.items():
             if not isinstance(path, list):
-                result.add_warning("view_paths", f"View path for '{view_id}' is not a list")
+                result.add_error(
+                    "view_paths", f"View path for '{view_id}' is not a list",
+                )
             elif len(path) == 0:
-                result.add_warning("view_paths", f"Empty path for view '{view_id}'")
+                result.add_error("view_paths", f"Empty path for view '{view_id}'")
+            elif view_id not in ALL_CONTENT_VIEWS and view_id not in GENERATED_VIEWS:
+                result.add_error(
+                    "view_paths", f"Unknown or deprecated view '{view_id}'",
+                )
+            elif view_id in ALL_CONTENT_VIEWS:
+                normalized = normalize_path(view_id, path)
+                cleaned = [
+                    str(part).strip().lower().replace("-", "_").replace(" ", "_")
+                    for part in path
+                    if str(part).strip()
+                ][:3]
+                if normalized is None:
+                    result.add_error(
+                        "view_paths",
+                        f"Noncanonical path for '{view_id}': {path!r}",
+                    )
+                elif normalized != cleaned:
+                    result.add_error(
+                        "view_paths",
+                        f"Path for '{view_id}' must use canonical IDs: "
+                        f"{path!r} -> {normalized!r}",
+                    )
 
     return result
 

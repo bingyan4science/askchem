@@ -8,8 +8,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY src/ src/
 COPY web/ web/
 
-ENV CHEMTREE_DB=/app/data/chemtree.db
+ENV ASKCHEM_DB=/app/data/askchem.db
 ENV PYTHONPATH=/app/src
+ENV CHEMTREE_DISABLE_PAW=1
 
 EXPOSE 8080
 

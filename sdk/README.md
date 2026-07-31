@@ -2,7 +2,7 @@
 
 The official Python client for **AskChem** — a hierarchical, multi-view, source-grounded knowledge index for chemistry.
 
-2.44M+ structured claims extracted from 146,000+ papers, organized into 5 browsable hierarchies.
+2.44M source-grounded claims from 146,000+ papers, organized through complementary taxonomy, temporal, author, and evidence-network views.
 
 ## Installation
 
@@ -45,8 +45,8 @@ print(result["status"])
 
 ```python
 ct = AskChem(
-    api_key="ac-...",                          # or set CHEMTREE_API_KEY
-    base_url="https://askchem.org",            # or set CHEMTREE_BASE_URL
+    api_key="ac-...",                          # or set ASKCHEM_API_KEY
+    base_url="https://askchem.org",            # or set ASKCHEM_BASE_URL
 )
 ```
 
@@ -54,7 +54,7 @@ ct = AskChem(
 
 | Method | Description |
 |--------|-------------|
-| `ct.search(query, view=..., ...)` | Hybrid search (FTS + paper + taxonomy + vector) across all claims |
+| `ct.search(query, view=..., ...)` | Hybrid search across source-grounded claims |
 | `ct.browse(view_id, path=..., depth=...)` | Browse the knowledge tree |
 | `ct.views()` | List all hierarchical views |
 | `ct.stats()` | Get index statistics |
@@ -64,17 +64,20 @@ ct = AskChem(
 
 ## Views
 
-AskChem organizes claims into 5 hierarchical views:
+AskChem's primary public taxonomy views are:
 
 - **by_reaction_type** — Chemical transformations (coupling, oxidation, etc.)
 - **by_substance_class** — Molecules and materials (MOFs, polymers, etc.)
 - **by_application** — Application domains (drug discovery, energy, etc.)
 - **by_technique** — Experimental methods (NMR, DFT, electrochemistry, etc.)
 - **by_mechanism** — Physical/chemical mechanisms (electron transfer, etc.)
+- **by_data** — Canonical measurements and reported values
+- **by_claim_type** — Epistemic and claim categories
+- **by_time_period** — Publication periods
 
 ## Migration: `search_grouped` removed in v0.3
 
-`ct.search_grouped(query, view=...)` was a presentation wrapper over `ct.search(query, view=...)` and has been removed. The grouping is now done client-side over the same response, since `search()` already exploits the taxonomy as one of four RRF recall signals (FTS + paper-level + tree-recall + vector). To reproduce the old grouped output:
+`ct.search_grouped(query, view=...)` was a presentation wrapper over `ct.search(query, view=...)` and has been removed. Grouping is now done client-side over the same response. To reproduce the old grouped output:
 
 ```python
 from collections import defaultdict

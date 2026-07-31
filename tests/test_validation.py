@@ -51,7 +51,7 @@ class TestValidClaims:
 
     def test_claim_with_view_paths(self):
         r = validate_claim(_make_claim(view_paths={
-            "by_reaction_type": ["catalysis", "cross_coupling"],
+            "by_reaction_type": ["coupling", "cross_coupling", "other"],
             "by_technique": ["spectroscopy"],
         }))
         assert r.is_valid
@@ -81,10 +81,21 @@ class TestMissingFields:
         assert not r.is_valid
         assert any(e.field == "source_doi" for e in r.errors)
 
-    def test_missing_verbatim_quote(self):
+    def test_missing_source_grounding(self):
+        # No quote and no locator -> error.
         r = validate_claim(_make_claim(verbatim_quote=""))
         assert not r.is_valid
         assert any(e.field == "verbatim_quote" for e in r.errors)
+
+    def test_evidence_locator_satisfies_grounding(self):
+        # A structured full-paper claim with a locator but no quote is valid
+        # (with a warning), matching the evidence-locator provenance model.
+        r = validate_claim(_make_claim(
+            verbatim_quote="",
+            evidence_locator={"location_in_paper": "Figure 4a", "evidence": ["FE_CO 98%"]},
+        ))
+        assert r.is_valid
+        assert any(w.field == "verbatim_quote" for w in r.warnings)
 
     def test_short_quote_warns(self):
         r = validate_claim(_make_claim(verbatim_quote="short"))
@@ -165,13 +176,29 @@ class TestReactionFields:
 
 
 class TestViewPaths:
+    def test_substance_view_is_accepted(self):
+        r = validate_claim(_make_claim(view_paths={
+            "by_substance_class": ["organic_compounds"],
+        }))
+        assert r.is_valid
+
+    def test_deprecated_substance_views_are_rejected(self):
+        for view_id in ("by_composition", "by_material_form"):
+            r = validate_claim(_make_claim(view_paths={
+                view_id: ["nanomaterials"],
+            }))
+            assert any(
+                "Unknown or deprecated view" in error.message
+                for error in r.errors
+            )
+
     def test_non_list_path_warns(self):
         r = validate_claim(_make_claim(view_paths={"by_reaction_type": "catalysis"}))
-        assert any("view_paths" in w.field for w in r.warnings)
+        assert any("view_paths" in error.field for error in r.errors)
 
     def test_empty_path_warns(self):
         r = validate_claim(_make_claim(view_paths={"by_reaction_type": []}))
-        assert any("view_paths" in w.field for w in r.warnings)
+        assert any("view_paths" in error.field for error in r.errors)
 
 
 # ── Non-standard confidence ──

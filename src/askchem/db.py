@@ -21,6 +21,7 @@ from typing import Optional
 from contextlib import contextmanager
 
 from askchem.display import smart_title
+from askchem.runtime_db import get_runtime_conn as _open_runtime_conn
 
 # Module-level caches
 _stats_cache: dict | None = None
@@ -46,6 +47,30 @@ import threading as _threading
 _SEARCH_CLAIMS_CACHE: dict = {}
 _SEARCH_CLAIMS_CACHE_ORDER: list = []
 _SEARCH_CLAIMS_CACHE_LOCK = _threading.Lock()
+
+
+def _env_enabled(name: str) -> bool:
+    """Return whether a CHEMTREE feature flag is explicitly enabled."""
+    return os.environ.get(name, "0").strip() == "1"
+
+
+def _search_experiment_config() -> tuple:
+    """Cache-key-safe snapshot of all ranking-affecting experiment knobs."""
+    flag_names = (
+        "CHEMTREE_DISABLE_TREE_RECALL",
+        "CHEMTREE_DISABLE_AUTHOR_RECALL",
+        "CHEMTREE_DISABLE_SOURCE_PAPER_RECALL",
+        "CHEMTREE_DISABLE_CLAIM_GUIDED_PAPER_RECALL",
+        "CHEMTREE_DISABLE_FTS",
+        "CHEMTREE_DISABLE_DENSE",
+        "CHEMTREE_DISABLE_CITATION_BOOST",
+        "CHEMTREE_DISABLE_RERANK",
+    )
+    flags = tuple((name, _env_enabled(name)) for name in flag_names)
+    return flags + (
+        ("CHEMTREE_MAX_QUERY_VARIANTS",
+         os.environ.get("CHEMTREE_MAX_QUERY_VARIANTS", "").strip()),
+    )
 
 
 def _search_cache_enabled() -> bool:
@@ -164,6 +189,11 @@ def get_conn(readonly=True):
         yield conn
     finally:
         conn.close()
+
+
+def get_runtime_conn(readonly=True):
+    """Open private mutable state with the corpus attached read-only."""
+    return _open_runtime_conn(get_db_path(), readonly=readonly)
 
 
 def init_db():
@@ -3417,18 +3447,37 @@ def search_claims(query: str, claim_type: str = None, view: str = None,
     sort = (sort or "relevance").lower()
     if sort not in ("relevance", "date"):
         sort = "relevance"
+    experiment_config = _search_experiment_config()
+    _profile_cache = _env_enabled("CHEMTREE_SEARCH_PROFILE")
+    _profile_started = _time.monotonic() if _profile_cache else None
     # Result-LRU short-circuit (opt-in via CHEMTREE_SEARCH_CACHE=1).
     _cache_key = None
     if _search_cache_enabled():
         _cache_key = (
             query, claim_type, view, int(limit), int(offset), bool(use_semantic),
-            mode, sort,
+            mode, sort, experiment_config,
         )
         _cached = _search_cache_get(_cache_key)
         if _cached is not None:
+            if _trace_into is not None:
+                _trace_into["cache_hit"] = True
+                _trace_into["experiment_config"] = dict(experiment_config)
+            if _profile_cache:
+                print("[search_profile] " + json.dumps({
+                    "pid": os.getpid(),
+                    "cache_hit": True,
+                    "total_ms": round(
+                        (_time.monotonic() - _profile_started) * 1000, 3,
+                    ),
+                    "config": dict(experiment_config),
+                }, separators=(",", ":")), flush=True)
             return dict(_cached)
-    _sc_debug = os.environ.get("CHEMTREE_SEARCH_PROFILE", "") == "1"
-    if _sc_debug:
+    if _trace_into is not None:
+        _trace_into["cache_hit"] = False
+        _trace_into["experiment_config"] = dict(experiment_config)
+    _sc_debug = _env_enabled("CHEMTREE_SEARCH_PROFILE")
+    _collect_timings = _sc_debug or _trace_into is not None
+    if _collect_timings:
         import time as _t
         _sc_t0 = _t.monotonic()
         _sc_marks = [("start", _sc_t0)]
@@ -3467,33 +3516,56 @@ def search_claims(query: str, claim_type: str = None, view: str = None,
             pass
 
     query_variants = expand_query_variants(query)
+    try:
+        max_variants = int(
+            os.environ.get("CHEMTREE_MAX_QUERY_VARIANTS", "0") or "0"
+        )
+    except ValueError:
+        max_variants = 0
+    if max_variants > 0:
+        query_variants = query_variants[:max_variants]
     author_hint = _extract_author_name(query)
     _mark("variants")
 
     with get_conn() as conn:
         _mark("conn")
         # ── ①b Tree-based BFS recall ──
-        tree_ranked = _tree_recall(
-            query, conn, top_k=TREE_TOP_K, restrict_view_id=view,
-        )
+        tree_ranked: list[str] = []
+        if not _env_enabled("CHEMTREE_DISABLE_TREE_RECALL"):
+            tree_ranked = _tree_recall(
+                query, conn, top_k=TREE_TOP_K, restrict_view_id=view,
+            )
+        if _trace_into is not None:
+            _trace_into["tree_pool"] = list(tree_ranked)
         _mark("tree_recall")
 
         # ── ①c Author recall (only when query looks like an author lookup) ──
         author_ranked: list[str] = []
         author_doi_set: set[str] = set()
-        if author_hint:
+        if (author_hint
+                and not _env_enabled("CHEMTREE_DISABLE_AUTHOR_RECALL")):
             author_ranked, author_doi_set = _author_recall(
                 author_hint, conn, top_k=PAPER_TOP_K,
             )
+        if _trace_into is not None:
+            _trace_into["author_pool"] = list(author_ranked)
+            _trace_into["author_doi_count"] = len(author_doi_set)
         _mark("author")
 
         # ── ② Paper-level recall (two complementary paths) ──
         # Path A: source_fts (title/abstract) recall with citation boost
-        paper_dois_a = _paper_recall(query, conn, top_k=PAPER_TOP_K)
+        paper_dois_a: list[str] = []
+        if not _env_enabled("CHEMTREE_DISABLE_SOURCE_PAPER_RECALL"):
+            paper_dois_a = _paper_recall(query, conn, top_k=PAPER_TOP_K)
+        _mark("source_paper_recall")
         # Path B: claim-guided recall (papers whose claims match, ranked
         # by citation count — catches authoritative papers BM25 misses)
-        paper_dois_b = _claim_guided_paper_recall(query, conn, top_k=PAPER_TOP_K)
-        _mark("paper_recall")
+        paper_dois_b: list[str] = []
+        if not _env_enabled("CHEMTREE_DISABLE_CLAIM_GUIDED_PAPER_RECALL"):
+            paper_dois_b = _claim_guided_paper_recall(
+                query, conn, top_k=PAPER_TOP_K,
+            )
+        _mark("claim_guided_paper_recall")
 
         # Merge: deduplicate, keeping order of first appearance
         seen_paper = set()
@@ -3505,6 +3577,7 @@ def search_claims(query: str, claim_type: str = None, view: str = None,
                 paper_dois.append(d)
 
         paper_claims = _get_claims_for_papers(paper_dois, conn)
+        _mark("paper_claim_hydration")
         paper_cid_set = {c.get('claim_id') for c in paper_claims if c.get('claim_id')}
         paper_claim_map = {c['claim_id']: c for c in paper_claims if c.get('claim_id')}
 
@@ -3518,24 +3591,49 @@ def search_claims(query: str, claim_type: str = None, view: str = None,
         for doi in paper_dois:
             cids = _by_paper.get(doi.lower(), [])
             paper_ranked.extend(cids[:CLAIMS_PER_PAPER_RRF])
+        if _trace_into is not None:
+            _trace_into["source_paper_dois"] = list(paper_dois_a)
+            _trace_into["claim_guided_paper_dois"] = list(paper_dois_b)
+            _trace_into["source_paper_pool"] = [
+                cid
+                for doi in paper_dois_a
+                for cid in _by_paper.get(doi.lower(), [])[:CLAIMS_PER_PAPER_RRF]
+            ]
+            _trace_into["claim_guided_paper_pool"] = [
+                cid
+                for doi in paper_dois_b
+                for cid in _by_paper.get(doi.lower(), [])[:CLAIMS_PER_PAPER_RRF]
+            ]
+            _trace_into["paper_doi_count"] = len(paper_dois)
+            _trace_into["paper_claims_loaded"] = len(paper_claims)
+            _trace_into["paper_pool"] = list(paper_ranked)
 
         # ── ③ Claim-level FTS recall (run on all query variants) ──
         fts_ranked_all: list[str] = []
         fts_data: dict[str, dict] = {}
         fts_seen: set[str] = set()
 
-        for variant in query_variants:
-            fts_queries = _build_fts_queries(variant, mode=mode)
-            rows, _ = _run_fts_cascade(fts_queries, claim_type,
-                                       CLAIM_FTS_LIMIT, conn)
-            for r in rows:
-                cid = r['claim_id']
-                if cid not in fts_seen:
-                    fts_seen.add(cid)
-                    fts_ranked_all.append(cid)
-                    fts_data[cid] = r
+        fts_variant_counts: list[dict] = []
+        if not _env_enabled("CHEMTREE_DISABLE_FTS"):
+            for variant in query_variants:
+                fts_queries = _build_fts_queries(variant, mode=mode)
+                rows, _ = _run_fts_cascade(
+                    fts_queries, claim_type, CLAIM_FTS_LIMIT, conn,
+                )
+                fts_variant_counts.append({
+                    "variant_index": len(fts_variant_counts),
+                    "query_shapes": len(fts_queries),
+                    "hits": len(rows),
+                })
+                for r in rows:
+                    cid = r['claim_id']
+                    if cid not in fts_seen:
+                        fts_seen.add(cid)
+                        fts_ranked_all.append(cid)
+                        fts_data[cid] = r
 
-        if not fts_ranked_all:
+        if (not fts_ranked_all
+                and not _env_enabled("CHEMTREE_DISABLE_FTS")):
             try:
                 from askchem.paw_functions import normalize_query
                 normalized = normalize_query(query)
@@ -3562,9 +3660,9 @@ def search_claims(query: str, claim_type: str = None, view: str = None,
         # "expand only" vs "expand + decompose" cleanly; if the env var is
         # unset, this block is a no-op and the existing fallback chain is
         # unchanged.
-        if not fts_ranked_all and os.environ.get(
-            "CHEMTREE_PAW_REWRITES", "0"
-        ) == "1":
+        if (not fts_ranked_all
+                and not _env_enabled("CHEMTREE_DISABLE_FTS")
+                and os.environ.get("CHEMTREE_PAW_REWRITES", "0") == "1"):
             try:
                 from askchem.paw_functions import decompose_query
                 sub_qs = decompose_query(query) or []
@@ -3586,9 +3684,11 @@ def search_claims(query: str, claim_type: str = None, view: str = None,
         if _trace_into is not None:
             _trace_into["fts_pool"] = list(fts_ranked_all)
             _trace_into["query_variants"] = list(query_variants)
+            _trace_into["fts_variant_counts"] = fts_variant_counts
         vec_ranked: list[str] = []
         vec_scores: dict[str, float] = {}
-        if use_semantic and embeddings_loaded():
+        if (use_semantic and embeddings_loaded()
+                and not _env_enabled("CHEMTREE_DISABLE_DENSE")):
             from askchem.retrieval import embed_query as _eq
             _ = _eq(query)
             _mark("embed_query")
@@ -3668,6 +3768,7 @@ def search_claims(query: str, claim_type: str = None, view: str = None,
                 ).fetchall()
                 for er in extra_rows:
                     extra_data[er['claim_id']] = er
+        _mark("candidate_fetch")
 
         def _load_claim(cid: str) -> dict | None:
             if cid in paper_claim_map:
@@ -3704,11 +3805,13 @@ def search_claims(query: str, claim_type: str = None, view: str = None,
                     rrf_scores[cid] + sem_score * 0.05, 4
                 )
                 claim_results.append(claim)
+        _mark("claim_json_hydration")
 
         # ── ⑤b Citation boost ──
         # Multiply relevance scores by (1 + α·normalized_log_citations).
         # Keeps relevance dominant but surfaces claims from landmark papers.
-        if claim_results:
+        if (claim_results
+                and not _env_enabled("CHEMTREE_DISABLE_CITATION_BOOST")):
             import math
             doi_set = {c.get('source_doi') for c in claim_results
                        if c.get('source_doi')}
@@ -3741,6 +3844,7 @@ def search_claims(query: str, claim_type: str = None, view: str = None,
                         key=lambda c: c.get('_relevance_score', 0),
                         reverse=True,
                     )
+        _mark("citation_boost")
 
         # ── ⑤c Cross-encoder rerank (γ1, opt-in via CHEMTREE_RETRIEVER_VERSION=v2) ──
         # Reorders only the top window — the bake-off picked
@@ -3752,7 +3856,8 @@ def search_claims(query: str, claim_type: str = None, view: str = None,
         # No-op when v1 is active or the v2 cross-encoder is disabled.
         try:
             _mark("pre_rerank")
-            if claim_results and cross_rerank_enabled():
+            if (claim_results and cross_rerank_enabled()
+                    and not _env_enabled("CHEMTREE_DISABLE_RERANK")):
                 from askchem.embeddings import _claim_to_text
                 # Hard cap at 50 (May-14 ablation: top-20 nDCG@10 unchanged
                 # vs. uncapped max(50, limit*2)). At limit=500 the uncapped
@@ -4105,14 +4210,52 @@ def search_claims(query: str, claim_type: str = None, view: str = None,
         enrich_claims_with_source(results, conn)
         _mark("done")
 
+        if _collect_timings:
+            timing_marks = [
+                {
+                    "stage": lab,
+                    "elapsed_ms": round((t - _sc_marks[0][1]) * 1000, 3),
+                    "duration_ms": round(
+                        (t - _sc_marks[i - 1][1]) * 1000, 3
+                    ) if i else 0.0,
+                }
+                for i, (lab, t) in enumerate(_sc_marks)
+            ]
+            if _trace_into is not None:
+                _trace_into["timings"] = timing_marks
+                _trace_into["counts"] = {
+                    "query_variants": len(query_variants),
+                    "tree_pool": len(tree_ranked),
+                    "author_pool": len(author_ranked),
+                    "paper_dois": len(paper_dois),
+                    "paper_claims_loaded": len(paper_claims),
+                    "paper_pool": len(paper_ranked),
+                    "fts_pool": len(fts_ranked_all),
+                    "vector_pool": len(vec_ranked),
+                    "rrf_pool": len(all_cids_ordered),
+                    "hydrated_candidates": len(claim_results),
+                    "final_results": len(results),
+                }
         if _sc_debug:
-            base = _sc_marks[0][1]
             print(
-                "[search_profile] "
-                + "  ".join(
-                    f"{lab}+{(t-base)*1000:.0f}ms"
-                    for lab, t in _sc_marks
-                ),
+                "[search_profile] " + json.dumps({
+                    "pid": os.getpid(),
+                    "cache_hit": False,
+                    "timings": timing_marks,
+                    "counts": {
+                        "query_variants": len(query_variants),
+                        "tree_pool": len(tree_ranked),
+                        "author_pool": len(author_ranked),
+                        "paper_dois": len(paper_dois),
+                        "paper_claims_loaded": len(paper_claims),
+                        "paper_pool": len(paper_ranked),
+                        "fts_pool": len(fts_ranked_all),
+                        "vector_pool": len(vec_ranked),
+                        "rrf_pool": len(all_cids_ordered),
+                        "final_results": len(results),
+                    },
+                    "config": dict(experiment_config),
+                }, separators=(",", ":")),
                 flush=True,
             )
 
@@ -5413,7 +5556,7 @@ def add_flag(claim_id: str, flag_type: str, category: str = '',
                    'duplicate', 'low_quality', 'other')
     if flag_type not in valid_types:
         raise ValueError(f"flag_type must be one of {valid_types}")
-    with get_conn(readonly=False) as conn:
+    with get_runtime_conn(readonly=False) as conn:
         c = conn.execute(
             "INSERT INTO community_flags "
             "(claim_id, flag_type, category, comment, suggested_fix, "
@@ -5428,7 +5571,7 @@ def add_flag(claim_id: str, flag_type: str, category: str = '',
 
 
 def get_flags_for_claim(claim_id: str) -> list[dict]:
-    with get_conn() as conn:
+    with get_runtime_conn() as conn:
         rows = conn.execute(
             "SELECT * FROM community_flags WHERE claim_id = ? ORDER BY created_at DESC",
             [claim_id]
@@ -5438,7 +5581,7 @@ def get_flags_for_claim(claim_id: str) -> list[dict]:
 
 def get_flag_summary() -> dict:
     """Aggregate flag counts by type and status."""
-    with get_conn() as conn:
+    with get_runtime_conn() as conn:
         by_type = conn.execute(
             "SELECT flag_type, COUNT(*) as cnt FROM community_flags "
             "GROUP BY flag_type ORDER BY cnt DESC"
@@ -5482,7 +5625,7 @@ def add_ltree_feedback(view_id: str, kind: str, node_id: str = None, doi: str = 
     """Record community feedback on a living-tree node/placement. Returns row id."""
     if kind not in _LTREE_FEEDBACK_KINDS:
         raise ValueError(f"kind must be one of {_LTREE_FEEDBACK_KINDS}")
-    with get_conn(readonly=False) as conn:
+    with get_runtime_conn(readonly=False) as conn:
         _ensure_ltree_feedback(conn)
         c = conn.execute(
             "INSERT INTO ltree_feedback (view_id,node_id,doi,kind,comment,"
@@ -5496,7 +5639,7 @@ def add_ltree_feedback(view_id: str, kind: str, node_id: str = None, doi: str = 
 
 def get_ltree_feedback_summary() -> dict:
     """Aggregate living-tree feedback counts (safe if the table is absent)."""
-    with get_conn() as conn:
+    with get_runtime_conn() as conn:
         try:
             total = conn.execute("SELECT COUNT(*) FROM ltree_feedback").fetchone()[0]
             open_ct = conn.execute(
@@ -5525,7 +5668,7 @@ def list_flags(status: str = None, flag_type: str = None,
         params.append(flag_type)
     sql += " ORDER BY f.created_at DESC LIMIT ? OFFSET ?"
     params.extend([limit, offset])
-    with get_conn() as conn:
+    with get_runtime_conn() as conn:
         rows = conn.execute(sql, params).fetchall()
         results = []
         for r in rows:
@@ -5540,7 +5683,7 @@ def resolve_flag(flag_id: int, status: str, reviewer_notes: str = ''):
     valid = ('reviewed', 'resolved', 'dismissed')
     if status not in valid:
         raise ValueError(f"status must be one of {valid}")
-    with get_conn(readonly=False) as conn:
+    with get_runtime_conn(readonly=False) as conn:
         conn.execute(
             "UPDATE community_flags SET status = ?, reviewed_at = ?, reviewer_notes = ? "
             "WHERE id = ?",
@@ -5582,7 +5725,7 @@ def get_paper_validation(doi: str) -> Optional[dict]:
 def add_submission(doi: str, name: str = '', email: str = '', notes: str = '') -> int:
     """Record a user paper submission. Returns the submission ID."""
     from datetime import datetime
-    with get_conn(readonly=False) as conn:
+    with get_runtime_conn(readonly=False) as conn:
         c = conn.execute(
             "INSERT INTO submissions (doi, submitted_at, status, submitter_name, submitter_email, notes) VALUES (?,?,?,?,?,?)",
             (doi, datetime.utcnow().isoformat(), 'pending', name, email, notes)
@@ -5592,13 +5735,13 @@ def add_submission(doi: str, name: str = '', email: str = '', notes: str = '') -
 
 
 def get_submission(submission_id: int) -> Optional[dict]:
-    with get_conn() as conn:
+    with get_runtime_conn() as conn:
         row = conn.execute("SELECT * FROM submissions WHERE id = ?", [submission_id]).fetchone()
         return dict(row) if row else None
 
 
 def list_submissions(status: str = None, limit: int = 50) -> list[dict]:
-    with get_conn() as conn:
+    with get_runtime_conn() as conn:
         if status:
             rows = conn.execute(
                 "SELECT * FROM submissions WHERE status = ? ORDER BY submitted_at DESC LIMIT ?",
@@ -5613,7 +5756,7 @@ def list_submissions(status: str = None, limit: int = 50) -> list[dict]:
 
 
 def update_submission(submission_id: int, status: str, result: dict = None):
-    with get_conn(readonly=False) as conn:
+    with get_runtime_conn(readonly=False) as conn:
         conn.execute(
             "UPDATE submissions SET status = ?, result = ? WHERE id = ?",
             (status, json.dumps(result) if result else None, submission_id)
@@ -5629,7 +5772,7 @@ def add_subscription(
     email: str | None = None,
 ) -> dict:
     """Add a subscription for a logged-in user. Returns subscription_id."""
-    with get_conn(readonly=False) as conn:
+    with get_runtime_conn(readonly=False) as conn:
         existing = conn.execute(
             "SELECT id FROM subscriptions "
             "WHERE user_id = ? AND sub_type = ? AND target = ? AND is_active = 1 LIMIT 1",
@@ -5656,7 +5799,7 @@ def add_subscription(
 
 def get_user_subscriptions(user_id: str) -> list[dict]:
     """List active subscriptions for a logged-in user."""
-    with get_conn() as conn:
+    with get_runtime_conn() as conn:
         rows = conn.execute(
             "SELECT id, sub_type, target, frequency, created_at, last_notified_at, email "
             "FROM subscriptions WHERE user_id = ? AND is_active = 1 "
@@ -5668,14 +5811,14 @@ def get_user_subscriptions(user_id: str) -> list[dict]:
 
 def get_subscription_row(sub_id: int) -> dict | None:
     """Return one subscription row or None."""
-    with get_conn() as conn:
+    with get_runtime_conn() as conn:
         row = conn.execute("SELECT * FROM subscriptions WHERE id = ?", [sub_id]).fetchone()
     return dict(row) if row else None
 
 
 def cancel_user_subscription(user_id: str, sub_id: int) -> None:
     """Cancel a subscription owned by this user."""
-    with get_conn(readonly=False) as conn:
+    with get_runtime_conn(readonly=False) as conn:
         row = conn.execute(
             "SELECT user_id FROM subscriptions WHERE id = ?", [sub_id]
         ).fetchone()
@@ -5697,7 +5840,7 @@ def add_bookmark(
     note: str | None = None,
 ) -> dict:
     """Add or update a bookmark. Idempotent on (user_id, target_type, target_id)."""
-    with get_conn(readonly=False) as conn:
+    with get_runtime_conn(readonly=False) as conn:
         conn.execute(
             "INSERT INTO bookmarks (user_id, target_type, target_id, title, note, created_at) "
             "VALUES (?, ?, ?, ?, ?, ?) "
@@ -5716,7 +5859,7 @@ def add_bookmark(
 
 
 def remove_bookmark(user_id: str, target_type: str, target_id: str) -> bool:
-    with get_conn(readonly=False) as conn:
+    with get_runtime_conn(readonly=False) as conn:
         cur = conn.execute(
             "DELETE FROM bookmarks WHERE user_id = ? AND target_type = ? AND target_id = ?",
             (user_id, target_type, target_id),
@@ -5726,7 +5869,7 @@ def remove_bookmark(user_id: str, target_type: str, target_id: str) -> bool:
 
 
 def list_bookmarks(user_id: str, target_type: str | None = None, limit: int = 200) -> list[dict]:
-    with get_conn() as conn:
+    with get_runtime_conn() as conn:
         if target_type:
             rows = conn.execute(
                 "SELECT id, target_type, target_id, title, note, created_at "
@@ -5745,7 +5888,7 @@ def list_bookmarks(user_id: str, target_type: str | None = None, limit: int = 20
 
 
 def is_bookmarked(user_id: str, target_type: str, target_id: str) -> bool:
-    with get_conn() as conn:
+    with get_runtime_conn() as conn:
         row = conn.execute(
             "SELECT 1 FROM bookmarks WHERE user_id = ? AND target_type = ? AND target_id = ? LIMIT 1",
             (user_id, target_type, target_id),
@@ -5763,7 +5906,7 @@ def add_saved_search(
     name: str | None = None,
 ) -> dict:
     filters_json = json.dumps(filters) if filters else None
-    with get_conn(readonly=False) as conn:
+    with get_runtime_conn(readonly=False) as conn:
         cur = conn.execute(
             "INSERT INTO saved_searches (user_id, name, query, view, filters, created_at) "
             "VALUES (?, ?, ?, ?, ?, ?)",
@@ -5774,7 +5917,7 @@ def add_saved_search(
 
 
 def list_saved_searches(user_id: str, limit: int = 200) -> list[dict]:
-    with get_conn() as conn:
+    with get_runtime_conn() as conn:
         rows = conn.execute(
             "SELECT id, name, query, view, filters, created_at FROM saved_searches "
             "WHERE user_id = ? ORDER BY created_at DESC LIMIT ?",
@@ -5793,7 +5936,7 @@ def list_saved_searches(user_id: str, limit: int = 200) -> list[dict]:
 
 
 def delete_saved_search(user_id: str, saved_id: int) -> bool:
-    with get_conn(readonly=False) as conn:
+    with get_runtime_conn(readonly=False) as conn:
         cur = conn.execute(
             "DELETE FROM saved_searches WHERE id = ? AND user_id = ?",
             (saved_id, user_id),
@@ -5811,7 +5954,7 @@ def create_reading_list(
     is_public: bool = False,
 ) -> dict:
     now = datetime.now().isoformat()
-    with get_conn(readonly=False) as conn:
+    with get_runtime_conn(readonly=False) as conn:
         cur = conn.execute(
             "INSERT INTO reading_lists "
             "(user_id, name, description, is_public, created_at, updated_at) "
@@ -5824,7 +5967,7 @@ def create_reading_list(
 
 def list_reading_lists(user_id: str) -> list[dict]:
     """Return the user's reading lists with item counts."""
-    with get_conn() as conn:
+    with get_runtime_conn() as conn:
         rows = conn.execute(
             "SELECT l.id, l.name, l.description, l.is_public, "
             "       l.created_at, l.updated_at, "
@@ -5843,7 +5986,7 @@ def get_user_reading_list(list_id: int, user_id: str | None = None) -> dict | No
     If ``user_id`` is ``None``, only public lists are returned.
     If ``user_id`` is provided, the owner can see their own private lists too.
     """
-    with get_conn() as conn:
+    with get_runtime_conn() as conn:
         row = conn.execute(
             "SELECT id, user_id, name, description, is_public, created_at, updated_at "
             "FROM reading_lists WHERE id = ?",
@@ -5889,7 +6032,7 @@ def update_reading_list(
     fields.append("updated_at = ?")
     params.append(datetime.now().isoformat())
     params.extend([list_id, user_id])
-    with get_conn(readonly=False) as conn:
+    with get_runtime_conn(readonly=False) as conn:
         cur = conn.execute(
             "UPDATE reading_lists SET " + ", ".join(fields) +
             " WHERE id = ? AND user_id = ?",
@@ -5901,7 +6044,7 @@ def update_reading_list(
 
 def delete_reading_list(list_id: int, user_id: str) -> bool:
     """Delete a list and its items. Ownership enforced."""
-    with get_conn(readonly=False) as conn:
+    with get_runtime_conn(readonly=False) as conn:
         row = conn.execute(
             "SELECT user_id FROM reading_lists WHERE id = ?", [list_id]
         ).fetchone()
@@ -5936,7 +6079,7 @@ def add_reading_list_item(
 ) -> dict:
     """Add an item to a reading list. Idempotent on (list_id, target_type, target_id)."""
     now = datetime.now().isoformat()
-    with get_conn(readonly=False) as conn:
+    with get_runtime_conn(readonly=False) as conn:
         _assert_list_ownership(conn, list_id, user_id)
         conn.execute(
             "INSERT INTO reading_list_items "
@@ -5966,7 +6109,7 @@ def remove_reading_list_item(
     target_type: str,
     target_id: str,
 ) -> bool:
-    with get_conn(readonly=False) as conn:
+    with get_runtime_conn(readonly=False) as conn:
         _assert_list_ownership(conn, list_id, user_id)
         cur = conn.execute(
             "DELETE FROM reading_list_items "
@@ -5988,7 +6131,7 @@ def get_lists_containing(
     target_id: str,
 ) -> list[int]:
     """Return IDs of the user's lists that already contain this target."""
-    with get_conn() as conn:
+    with get_runtime_conn() as conn:
         rows = conn.execute(
             "SELECT l.id FROM reading_lists l "
             "JOIN reading_list_items i ON i.list_id = l.id "
@@ -6001,7 +6144,7 @@ def get_lists_containing(
 # ── User-owned API keys ────────────────────────────────────────────────────
 
 def list_user_api_keys(user_id: str) -> list[dict]:
-    with get_conn() as conn:
+    with get_runtime_conn() as conn:
         rows = conn.execute(
             "SELECT key_id, name, tier, rate_limit, created_at, last_used_at, is_active, "
             "COALESCE(total_requests, 0) AS total_requests "
@@ -6025,7 +6168,7 @@ def create_user_api_key(
     rpm = 1000 if tier in ("pro", "registered", "tier_3") else (
         500 if tier == "tier_2" else 200
     )
-    with get_conn(readonly=False) as conn:
+    with get_runtime_conn(readonly=False) as conn:
         conn.execute(
             "INSERT INTO api_keys "
             "(key_id, key_hash, name, email, tier, rate_limit, created_at, total_requests, user_id) "
@@ -6038,7 +6181,7 @@ def create_user_api_key(
 
 
 def revoke_user_api_key(user_id: str, key_id: str) -> bool:
-    with get_conn(readonly=False) as conn:
+    with get_runtime_conn(readonly=False) as conn:
         row = conn.execute(
             "SELECT user_id FROM api_keys WHERE key_id = ?", [key_id]
         ).fetchone()
@@ -6060,7 +6203,7 @@ def get_due_subscriptions() -> list[dict]:
     row has no email set (all authenticated subs).
     """
     now = datetime.now()
-    with get_conn() as conn:
+    with get_runtime_conn() as conn:
         rows = conn.execute(
             "SELECT s.id, COALESCE(NULLIF(s.email,''), u.email) AS email, "
             "       s.sub_type, s.target, s.frequency, s.created_at, "
@@ -6093,7 +6236,7 @@ def get_due_subscriptions() -> list[dict]:
 
 def update_subscription_notified(sub_id: int):
     """Mark a subscription as just notified."""
-    with get_conn(readonly=False) as conn:
+    with get_runtime_conn(readonly=False) as conn:
         conn.execute(
             "UPDATE subscriptions SET last_notified_at = ? WHERE id = ?",
             (datetime.now().isoformat(), sub_id),
@@ -6104,7 +6247,7 @@ def update_subscription_notified(sub_id: int):
 def log_notification(subscription_id: int, claim_count: int,
                      status: str = "sent", error: str = None):
     """Log a notification attempt."""
-    with get_conn(readonly=False) as conn:
+    with get_runtime_conn(readonly=False) as conn:
         conn.execute(
             "INSERT INTO notification_log (subscription_id, sent_at, claim_count, status, error) "
             "VALUES (?, ?, ?, ?, ?)",
@@ -6115,7 +6258,7 @@ def log_notification(subscription_id: int, claim_count: int,
 
 def get_notification_history(sub_id: int, limit: int = 20) -> list[dict]:
     """Get notification history for a subscription."""
-    with get_conn() as conn:
+    with get_runtime_conn() as conn:
         rows = conn.execute(
             "SELECT id, sent_at, claim_count, status, error "
             "FROM notification_log WHERE subscription_id = ? "
@@ -7090,7 +7233,7 @@ def create_api_key(name: str, email: str = "", tier: str = "tier_1") -> dict:
         500 if tier == "tier_2" else 200
     )
 
-    with get_conn(readonly=False) as conn:
+    with get_runtime_conn(readonly=False) as conn:
         conn.execute(
             "INSERT INTO api_keys (key_id, key_hash, name, email, tier, rate_limit, created_at, total_requests) "
             "VALUES (?, ?, ?, ?, ?, ?, ?, 0)",
@@ -7104,7 +7247,7 @@ def create_api_key(name: str, email: str = "", tier: str = "tier_1") -> dict:
 def validate_api_key(raw_key: str) -> dict | None:
     """Validate an API key. Returns key info or None."""
     key_hash = hashlib.sha256(raw_key.encode()).hexdigest()
-    with get_conn() as conn:
+    with get_runtime_conn() as conn:
         row = conn.execute(
             "SELECT key_id, name, tier, rate_limit, is_active, created_at, "
             "COALESCE(total_requests, 0) AS total_requests FROM api_keys WHERE key_hash = ?",
@@ -7118,7 +7261,7 @@ def validate_api_key(raw_key: str) -> dict | None:
     new_tier = _compute_graduated_tier(tier, total_requests, created_at)
     if new_tier != tier:
         try:
-            with get_conn(readonly=False) as conn:
+            with get_runtime_conn(readonly=False) as conn:
                 conn.execute(
                     "UPDATE api_keys SET tier = ? WHERE key_id = ?",
                     (new_tier, row["key_id"]),
@@ -7128,7 +7271,7 @@ def validate_api_key(raw_key: str) -> dict | None:
             pass
         tier = new_tier
     try:
-        with get_conn(readonly=False) as conn:
+        with get_runtime_conn(readonly=False) as conn:
             conn.execute(
                 "UPDATE api_keys SET last_used_at = ? WHERE key_hash = ?",
                 (datetime.now().isoformat(), key_hash),
@@ -7151,7 +7294,7 @@ def get_key_rpd_today(key_id: str) -> int:
     from datetime import datetime, timezone
 
     day = datetime.now(timezone.utc).date().isoformat()
-    with get_conn() as conn:
+    with get_runtime_conn() as conn:
         row = conn.execute(
             "SELECT request_count FROM key_usage WHERE key_id = ? AND date = ?",
             (key_id, day),
@@ -7165,7 +7308,7 @@ def record_authenticated_api_request(key_id: str) -> None:
 
     day = datetime.now(timezone.utc).date().isoformat()
     try:
-        with get_conn(readonly=False) as conn:
+        with get_runtime_conn(readonly=False) as conn:
             conn.execute(
                 "INSERT INTO key_usage (key_id, date, request_count) VALUES (?, ?, 1) "
                 "ON CONFLICT(key_id, date) DO UPDATE SET request_count = request_count + 1",
@@ -7185,7 +7328,7 @@ def get_api_key_usage_summary(key_id: str, days: int = 30) -> dict:
     from datetime import datetime, timedelta, timezone
 
     cutoff = (datetime.now(timezone.utc).date() - timedelta(days=days - 1)).isoformat()
-    with get_conn() as conn:
+    with get_runtime_conn() as conn:
         total_row = conn.execute(
             "SELECT COALESCE(total_requests, 0) FROM api_keys WHERE key_id = ?",
             (key_id,),
@@ -7202,7 +7345,7 @@ def get_api_key_usage_summary(key_id: str, days: int = 30) -> dict:
 
 def log_security_event(event_type: str, ip_hash: str = "", details: str = ""):
     try:
-        with get_conn(readonly=False) as conn:
+        with get_runtime_conn(readonly=False) as conn:
             conn.execute(
                 "INSERT INTO security_log (timestamp, event_type, ip_hash, details) VALUES (?,?,?,?)",
                 (datetime.now().isoformat(), event_type, ip_hash or None, details or None),
@@ -7216,7 +7359,7 @@ def get_security_events(days: int = 7, event_type: str = None, limit: int = 500)
     from datetime import timedelta
 
     cutoff = (datetime.now() - timedelta(days=days)).isoformat()
-    with get_conn() as conn:
+    with get_runtime_conn() as conn:
         sql = "SELECT * FROM security_log WHERE timestamp >= ?"
         params: list = [cutoff]
         if event_type:
@@ -7282,7 +7425,7 @@ def log_query(query: str, endpoint: str, view: str = None, filters: str = None,
               user_id: str = None) -> int | None:
     """Log a search query for analytics. Returns the inserted query_log.id."""
     try:
-        with get_conn(readonly=False) as conn:
+        with get_runtime_conn(readonly=False) as conn:
             cur = conn.execute(
                 "INSERT INTO query_log "
                 "(timestamp, query, endpoint, view, filters, result_count, "
@@ -7299,7 +7442,7 @@ def log_query(query: str, endpoint: str, view: str = None, filters: str = None,
 
 def get_user_query_history(user_id: str, limit: int = 50, offset: int = 0) -> list[dict]:
     """Return recent queries by a user, newest first."""
-    with get_conn() as conn:
+    with get_runtime_conn() as conn:
         rows = conn.execute(
             "SELECT id, timestamp, query, endpoint, view, filters, "
             "       result_count, latency_ms "
@@ -7316,7 +7459,7 @@ def log_click(target_type: str, target_id: str,
               ip_hash: str = None) -> None:
     """Log that a user clicked a search result (claim / paper / link)."""
     try:
-        with get_conn(readonly=False) as conn:
+        with get_runtime_conn(readonly=False) as conn:
             conn.execute(
                 "INSERT INTO click_log "
                 "(timestamp, query_log_id, query, target_type, target_id, "
@@ -7334,7 +7477,7 @@ def get_query_stats(days: int = 30, limit: int = 50) -> dict:
     """Get query analytics for the last N days."""
     from datetime import timedelta
     cutoff = (datetime.now() - timedelta(days=days)).isoformat()
-    with get_conn() as conn:
+    with get_runtime_conn() as conn:
         total = conn.execute(
             "SELECT COUNT(*) FROM query_log WHERE timestamp > ?", (cutoff,)
         ).fetchone()[0]
@@ -7628,8 +7771,7 @@ def merge_deep_claims(data_dir: Path = None):
         'background': 'background', 'historical': 'historical',
         'definition': 'definitions', 'observation': 'observations',
     }
-    ALL_CONTENT_VIEWS = ['by_reaction_type', 'by_substance_class', 'by_application',
-                         'by_technique', 'by_mechanism']
+    from askchem.taxonomy import ALL_CONTENT_VIEWS
 
     sources_added = 0
     claims_added = 0
@@ -7762,7 +7904,7 @@ def create_user(email: str, display_name: str = "") -> dict:
     """Create a new user or return existing. Returns {user_id, email, display_name, created_at}."""
     import uuid
     now = datetime.now().isoformat()
-    with get_conn(readonly=False) as conn:
+    with get_runtime_conn(readonly=False) as conn:
         existing = conn.execute(
             "SELECT user_id, email, display_name, created_at FROM users WHERE email = ?",
             [email],
@@ -7787,7 +7929,7 @@ def get_or_create_clerk_user(clerk_id: str, email: str = "") -> dict:
     """Find user by Clerk ID, or create a new one. Returns user dict."""
     import uuid as _uuid
     now = datetime.now().isoformat()
-    with get_conn(readonly=False) as conn:
+    with get_runtime_conn(readonly=False) as conn:
         row = conn.execute(
             "SELECT user_id, email, display_name, clerk_id, created_at "
             "FROM users WHERE clerk_id = ?",
@@ -7840,7 +7982,7 @@ def get_or_create_clerk_user(clerk_id: str, email: str = "") -> dict:
 
 
 def get_user_by_email(email: str) -> dict | None:
-    with get_conn() as conn:
+    with get_runtime_conn() as conn:
         row = conn.execute(
             "SELECT user_id, email, display_name, created_at FROM users WHERE email = ?",
             [email],
@@ -7849,7 +7991,7 @@ def get_user_by_email(email: str) -> dict | None:
 
 
 def get_user_by_id(user_id: str) -> dict | None:
-    with get_conn() as conn:
+    with get_runtime_conn() as conn:
         row = conn.execute(
             "SELECT user_id, email, display_name, created_at FROM users WHERE user_id = ?",
             [user_id],
@@ -7863,7 +8005,7 @@ def create_session(user_id: str, ttl_days: int = 30) -> str:
     token = secrets.token_urlsafe(32)
     now = datetime.now()
     expires = now + timedelta(days=ttl_days)
-    with get_conn(readonly=False) as conn:
+    with get_runtime_conn(readonly=False) as conn:
         conn.execute(
             "INSERT INTO user_sessions (session_token, user_id, created_at, expires_at) "
             "VALUES (?, ?, ?, ?)",
@@ -7875,7 +8017,7 @@ def create_session(user_id: str, ttl_days: int = 30) -> str:
 
 def validate_session(token: str) -> dict | None:
     """Validate a session token. Returns user dict or None if expired/invalid."""
-    with get_conn() as conn:
+    with get_runtime_conn() as conn:
         row = conn.execute(
             "SELECT s.user_id, s.expires_at, u.email, u.display_name "
             "FROM user_sessions s JOIN users u ON u.user_id = s.user_id "
@@ -7892,14 +8034,14 @@ def validate_session(token: str) -> dict | None:
 
 
 def expire_session(token: str) -> None:
-    with get_conn(readonly=False) as conn:
+    with get_runtime_conn(readonly=False) as conn:
         conn.execute("DELETE FROM user_sessions WHERE session_token = ?", [token])
         conn.commit()
 
 
 def cleanup_expired_sessions() -> int:
     """Delete expired sessions. Returns count deleted."""
-    with get_conn(readonly=False) as conn:
+    with get_runtime_conn(readonly=False) as conn:
         cursor = conn.execute(
             "DELETE FROM user_sessions WHERE expires_at < ?",
             [datetime.now().isoformat()],
@@ -7913,7 +8055,7 @@ def upsert_feedback(user_id: str, target_type: str, target_id: str,
     """Insert or toggle feedback. If the same vote exists, remove it (toggle off).
     If the opposite vote exists, replace it. Returns {action, feedback_type}."""
     now = datetime.now().isoformat()
-    with get_conn(readonly=False) as conn:
+    with get_runtime_conn(readonly=False) as conn:
         existing = conn.execute(
             "SELECT id, feedback_type FROM feedback "
             "WHERE user_id = ? AND target_type = ? AND target_id = ? "
@@ -7941,7 +8083,7 @@ def upsert_feedback(user_id: str, target_type: str, target_id: str,
 def get_feedback_summary(target_type: str, target_id: str,
                          user_id: str = None) -> dict:
     """Get vote counts for a target. Optionally includes current user's vote."""
-    with get_conn() as conn:
+    with get_runtime_conn() as conn:
         rows = conn.execute(
             "SELECT feedback_type, COUNT(*) as cnt FROM feedback "
             "WHERE target_type = ? AND target_id = ? AND feedback_type IN ('upvote', 'downvote') "
@@ -7969,7 +8111,7 @@ def get_feedback_batch(target_type: str, target_ids: list[str],
     """Get vote summaries for multiple targets in one query."""
     if not target_ids:
         return {}
-    with get_conn() as conn:
+    with get_runtime_conn() as conn:
         ph = ",".join("?" * len(target_ids))
         rows = conn.execute(
             f"SELECT target_id, feedback_type, COUNT(*) as cnt FROM feedback "
@@ -8004,7 +8146,7 @@ def get_feedback_batch(target_type: str, target_ids: list[str],
 
 def get_user_feedback(user_id: str, limit: int = 50, offset: int = 0) -> list[dict]:
     """Get a user's feedback history."""
-    with get_conn() as conn:
+    with get_runtime_conn() as conn:
         rows = conn.execute(
             "SELECT target_type, target_id, feedback_type, comment, created_at "
             "FROM feedback WHERE user_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?",

@@ -272,8 +272,15 @@ class TestCommunity:
         assert "flags" in data
         assert "summary" in data
 
-    def test_subscribe(self, client):
-        r = client.post("/api/subscribe", json={
+    def test_subscribe(self, client, monkeypatch):
+        from askchem import server
+
+        monkeypatch.setattr(
+            server,
+            "_get_current_user",
+            lambda request: {"user_id": "u_test", "email": "test@test.com"},
+        )
+        r = client.post("/api/me/subscriptions", json={
             "email": "test@test.com",
             "sub_type": "topic",
             "target": "catalysis",
@@ -282,17 +289,31 @@ class TestCommunity:
         assert r.status_code == 200
         data = r.json()
         assert data["subscription_id"] == 1
-        assert "manage_token" in data
+        assert data["status"] == "active"
 
-    def test_list_subscriptions(self, client):
-        r = client.get("/api/subscriptions?email=test@test.com&token=test-mtok")
+    def test_list_subscriptions(self, client, monkeypatch):
+        from askchem import server
+
+        monkeypatch.setattr(
+            server,
+            "_get_current_user",
+            lambda request: {"user_id": "u_test", "email": "test@test.com"},
+        )
+        r = client.get("/api/me/subscriptions")
         assert r.status_code == 200
         data = r.json()
         assert "subscriptions" in data
         assert data["count"] == 0
 
-    def test_cancel_subscription(self, client):
-        r = client.delete("/api/subscriptions/1?token=test-mtok")
+    def test_cancel_subscription(self, client, monkeypatch):
+        from askchem import server
+
+        monkeypatch.setattr(
+            server,
+            "_get_current_user",
+            lambda request: {"user_id": "u_test", "email": "test@test.com"},
+        )
+        r = client.delete("/api/me/subscriptions/1")
         assert r.status_code == 200
         assert r.json()["status"] == "cancelled"
 

@@ -1,6 +1,7 @@
 # PAW integration harness: compiles/runs neural programs; needs programasweights + network.
 collect_ignore = ["test_paw.py"]
 
+import os
 import sys
 from pathlib import Path
 from unittest.mock import MagicMock
@@ -8,6 +9,7 @@ from unittest.mock import MagicMock
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+os.environ.setdefault("ASKCHEM_DISABLE_PAW_WARMUP", "1")
 
 # Pre-mock askchem.embeddings (requires numpy + sentence-transformers)
 # before askchem.server can import it.
@@ -38,6 +40,10 @@ SAMPLE_CLAIM = {
     "extraction_model": "gpt-5.4",
     "extraction_version": "v2",
     "reaction_type": "cross_coupling",
+    "view_paths": {
+        "by_reaction_type": ["coupling", "cross_coupling", "suzuki_miyaura"],
+        "by_substance_class": ["inorganic_compounds", "metals_and_alloys", "palladium"],
+    },
 }
 
 SAMPLE_SOURCE = {
@@ -134,11 +140,10 @@ def _patch_db(monkeypatch):
         db_mod, "add_subscription",
         lambda **kw: {"subscription_id": 1, "manage_token": "test-mtok"},
     )
-    # Legacy email/manage-token subscription API was replaced by user-based
-    # subscriptions (get_user_subscriptions); patch non-raising so the stale
-    # references don't break the fixture on current db.py.
-    monkeypatch.setattr(db_mod, "get_subscriptions", lambda email, manage_token: [], raising=False)
-    monkeypatch.setattr(db_mod, "cancel_subscription", lambda sid, manage_token: None, raising=False)
+    monkeypatch.setattr(db_mod, "get_user_subscriptions", lambda user_id: [])
+    monkeypatch.setattr(
+        db_mod, "cancel_user_subscription", lambda user_id, sub_id: None
+    )
     monkeypatch.setattr(db_mod, "get_subscription_row",
                         lambda sid: {"id": sid, "manage_token": "test-mtok"} if sid == 1 else None)
     monkeypatch.setattr(db_mod, "get_notification_history",
