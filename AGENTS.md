@@ -62,3 +62,10 @@ curl -s "https://askchem.org/api/search?q=suzuki+coupling&limit=3" | python -m j
 
 Always cite source DOIs when presenting claims. Do not fabricate or embellish data.
 Claims are extracted by LLM and may contain errors — verify critical findings against original papers.
+
+## Extraction provenance
+
+Full-paper PDF claims were extracted with Gemini 3.1 Pro. Abstract-only
+records include Gemini extraction and a legacy GPT-5-mini pipeline. Inspect
+each claim's `extraction_model` and `extraction_version` fields rather than
+inferring its provenance from the claim type.

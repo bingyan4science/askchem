@@ -37,7 +37,7 @@ SAMPLE_CLAIM = {
     "source_paper_title": "Test Paper on Suzuki Coupling",
     "confidence": "high",
     "verbatim_quote": "The Suzuki coupling proceeded in 95% yield.",
-    "extraction_model": "gpt-5.4",
+    "extraction_model": "gemini-3.1-pro",
     "extraction_version": "v2",
     "reaction_type": "cross_coupling",
     "view_paths": {

@@ -841,12 +841,20 @@ def cmd_build(args):
 
             source_title = titles.get(doi.lower(), '') or corpus.get(doi.lower(), {}).get('title', '')
 
+            extraction_model = (
+                result.get('extraction_model')
+                or raw_claim.get('extraction_model')
+                or 'gemini-3.1-pro'
+            )
+            if 'gemini' in str(extraction_model).lower():
+                extraction_model = 'gemini-3.1-pro'
+
             claim_data = dict(raw_claim)
             claim_data.update({
                 'claim_id': claim_id,
                 'source_doi': doi,
                 'source_paper_title': source_title,
-                'extraction_model': 'gpt-5.4',
+                'extraction_model': extraction_model,
                 'extraction_version': 'deep_v1',
                 'view_paths': view_paths,
             })
@@ -856,7 +864,7 @@ def cmd_build(args):
                 raw_claim.get('confidence', 'high'),
                 raw_claim.get('location_in_paper', ''),
                 raw_claim.get('verbatim_quote', ''),
-                'gpt-5.4', 'deep_v1',
+                extraction_model, 'deep_v1',
                 result.get('collected_at', datetime.now().isoformat()),
                 json.dumps(view_paths),
                 json.dumps(claim_data),

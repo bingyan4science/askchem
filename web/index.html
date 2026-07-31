@@ -2830,7 +2830,7 @@
   "source_doi": "10.1002/anie.201914977",
   "source_paper_title": "Single-Atom Nickel...",
   "confidence": "high",
-  "extraction_model": "gpt-5.4",
+  "extraction_model": "gemini-3.1-pro",
   "extraction_version": "deep_v1",
   "view_paths": {
     "by_reaction_type": "Electrocatalysis/CO2 Reduction",
@@ -3010,8 +3010,8 @@ pip install mcp</pre>
         <a href="#" onclick="showPage('agents'); return false;">MCP / API client</a> ·
         <a href="#" onclick="showPage('api'); return false;">Docs</a> ·
         <a href="#" onclick="showPage('agents'); return false;">Agents</a> ·
-        <a href="https://huggingface.co/datasets/bing-yan/askchem" target="_blank">Dataset</a>
-        <div style="margin-top: 0.4rem; font-size: 0.72rem; color: var(--text-dim);">Source code opening soon.</div>
+        <a href="https://huggingface.co/datasets/bing-yan/askchem" target="_blank">Dataset</a> ·
+        <a href="https://github.com/bingyan4science/askchem" target="_blank">Source code</a>
         <div id="citation-source-footer" style="margin-top: 0.5rem; font-size: 0.7rem; color: var(--text-dim);"></div>
     </footer>
 
@@ -7314,22 +7314,21 @@ pip install mcp</pre>
                 html += '</div>';
                 html += '<div style="display: flex; justify-content: space-between; font-size: 0.8rem; color: var(--text-secondary);">';
                 html += '<span><strong style="color: var(--accent);">Full paper (Gemini 3.1 Pro):</strong> ' + formatNumber(ed.full_paper || 0) + ' claims</span>';
-                html += '<span><strong style="color: var(--orange);">Abstract only (GPT-5-mini):</strong> ' + formatNumber(ed.abstract_only || 0) + ' claims</span>';
+                html += '<span><strong style="color: var(--orange);">Abstract only (Gemini + legacy GPT-5-mini):</strong> ' + formatNumber(ed.abstract_only || 0) + ' claims</span>';
                 html += '</div>';
                 if (ed.full_paper_by_model) {
                     var fpbm = ed.full_paper_by_model;
-                    var geminiFull = 0, gptFull = 0, otherFull = 0;
+                    var geminiFull = 0, otherFull = 0;
                     Object.keys(fpbm).forEach(function(k) {
                         var v = fpbm[k] || 0;
                         var lk = String(k).toLowerCase();
                         if (lk.indexOf('gemini') !== -1) geminiFull += v;
-                        else if (lk.indexOf('gpt') !== -1) gptFull += v;
                         else otherFull += v;
                     });
                     var fullPaperPapers = ed.full_paper_papers || 0;
                     html += '<div style="display:flex; justify-content:space-between; gap:1rem; font-size:0.78rem; color: var(--text-secondary); margin-top:0.4rem;">';
                     html += '<span>Gemini full-paper claims: <strong>' + formatNumber(geminiFull) + '</strong></span>';
-                    if (gptFull > 0) html += '<span>GPT full-paper claims: <strong>' + formatNumber(gptFull) + '</strong></span>';
+                    if (otherFull > 0) html += '<span>Unnormalized legacy model labels: <strong>' + formatNumber(otherFull) + '</strong></span>';
                     html += '<span>Full-paper source DOIs: <strong>' + formatNumber(fullPaperPapers) + '</strong></span>';
                     html += '</div>';
                 }
@@ -7451,8 +7450,8 @@ pip install mcp</pre>
                     var citDate = new Date(data.citations_updated_at).toLocaleDateString('en-US', {year:'numeric', month:'long', day:'numeric'});
                     html += '<div style="margin-bottom: 0.4rem;"><strong>Citations last updated:</strong> ' + citDate + '</div>';
                 }
-                html += '<div style="margin-bottom: 0.4rem;"><strong>Claim extraction:</strong> Gemini-3.1-pro-preview and GPT-5.4 (full paper PDF), plus GPT-5-mini (abstract batch)</div>';
-                html += '<div style="margin-bottom: 0.4rem;"><strong>Claim classification:</strong> Gemini-3.1-pro-preview and GPT-5-mini (hierarchical views)</div>';
+                html += '<div style="margin-bottom: 0.4rem;"><strong>Claim extraction:</strong> Gemini 3.1 Pro (full-paper PDFs); Gemini 3.1 Pro Preview and legacy GPT-5-mini pipelines (abstract-only records)</div>';
+                html += '<div style="margin-bottom: 0.4rem;"><strong>Claim classification:</strong> Gemini 3.1 Pro Preview and legacy GPT-5-mini (hierarchical views)</div>';
                 html += '<div style="margin-bottom: 0.4rem;"><strong>Dataset distribution:</strong> the full claim index is published on the <a href="https://huggingface.co/datasets/bing-yan/askchem" target="_blank" style="color: var(--accent);">HuggingFace Hub (bing-yan/askchem)</a> and mirrored to the <a href="/api/docs" style="color: var(--accent);">REST API</a>.</div>';
                 html += '<div><strong>Per-claim provenance:</strong> every claim carries a verbatim source quote and a source DOI that resolves to the original paper via <a href="https://www.crossref.org/" target="_blank" style="color: var(--accent);">CrossRef</a>/<a href="https://www.doi.org/" target="_blank" style="color: var(--accent);">doi.org</a>. Open any claim\'s paper to see its journal, year, authors, and citation count.</div>';
                 html += '</div>';

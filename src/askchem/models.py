@@ -57,7 +57,7 @@ class Claim:
     confidence: str = "high"  # high, medium, low
     location_in_paper: str = ""
     verbatim_quote: str = ""
-    extraction_model: str = "gpt-5.4"
+    extraction_model: str = "unknown"
     extraction_version: str = "v2"
     extracted_at: str = ""
 

@@ -23,7 +23,7 @@ def _make_claim(**overrides) -> dict:
         "source_paper_title": "Test Paper",
         "confidence": "high",
         "verbatim_quote": "The reaction proceeded in 95% yield under mild conditions.",
-        "extraction_model": "gpt-5.4",
+        "extraction_model": "gemini-3.1-pro",
         "extraction_version": "v2",
     }
     base.update(overrides)

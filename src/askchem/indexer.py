@@ -199,8 +199,15 @@ def load_extracted_claims(experiments_dir: Path) -> tuple[list[Claim], list[Sour
                 )
                 sources_seen[doi] = source
 
-            # Create claims
-            for raw_claim in paper.get("stage2", {}).get("result", {}).get("claims", []):
+            # Create claims without inventing a provider label when an older
+            # experiment omitted model provenance.
+            stage2 = paper.get("stage2", {})
+            stage2_model = (
+                stage2.get("extraction_model")
+                or stage2.get("model")
+                or "unknown"
+            )
+            for raw_claim in stage2.get("result", {}).get("claims", []):
                 claim_type = raw_claim.get("claim_type", "unknown")
                 content_hash = str(hash(json.dumps(raw_claim, sort_keys=True)))[:12]
                 claim_id = Claim.generate_id(doi or paper_title, claim_type, content_hash)
@@ -213,7 +220,9 @@ def load_extracted_claims(experiments_dir: Path) -> tuple[list[Claim], list[Sour
                     confidence=raw_claim.get("confidence", "medium"),
                     location_in_paper=raw_claim.get("location_in_paper", ""),
                     verbatim_quote=raw_claim.get("verbatim_quote", ""),
-                    extraction_model="gpt-5.4",
+                    extraction_model=raw_claim.get(
+                        "extraction_model", stage2_model
+                    ),
                     extraction_version="v2",
                     extracted_at=datetime.now().isoformat(),
                     reaction_type=raw_claim.get("reaction_type", ""),

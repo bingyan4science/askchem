@@ -7718,7 +7718,9 @@ def merge_deep_claims(data_dir: Path = None):
     """Merge deep PDF extraction claims into the SQLite database.
 
     Reads from data/deep_results/*.json and data/classify_pipeline/classifications.json.
-    These are full-paper claims extracted by gpt-5.4 with richer detail than abstract claims.
+    These are full-paper claims extracted with Gemini 3.1 Pro, with richer
+    detail than abstract-only claims. Preserve explicit per-result model
+    metadata when importing historical fallback outputs.
     """
     if data_dir is None:
         data_dir = Path(__file__).parent.parent.parent / "data"
@@ -7814,6 +7816,14 @@ def merge_deep_claims(data_dir: Path = None):
             subfield = paper_knowledge.get('subfield', '')
             source_title = corpus.get(doi.lower(), {}).get('title', '')
 
+            result_model = (
+                result.get('extraction_model')
+                or result.get('model')
+                or 'gemini-3.1-pro'
+            )
+            if 'gemini' in str(result_model).lower():
+                result_model = 'gemini-3.1-pro'
+
             for raw_claim in result.get('data', {}).get('claims', []):
                 claim_type = raw_claim.get('claim_type', 'unknown')
                 content_hash = hashlib.sha256(
@@ -7843,12 +7853,18 @@ def merge_deep_claims(data_dir: Path = None):
                     ct_path.append(subfield.lower().replace(' ', '_'))
                 view_paths['by_claim_type'] = ct_path
 
+                extraction_model = (
+                    raw_claim.get('extraction_model') or result_model
+                )
+                if 'gemini' in str(extraction_model).lower():
+                    extraction_model = 'gemini-3.1-pro'
+
                 claim_data = dict(raw_claim)
                 claim_data.update({
                     'claim_id': claim_id,
                     'source_doi': doi,
                     'source_paper_title': source_title,
-                    'extraction_model': 'gpt-5.4',
+                    'extraction_model': extraction_model,
                     'extraction_version': 'deep_v1',
                     'view_paths': view_paths,
                 })
@@ -7863,7 +7879,7 @@ def merge_deep_claims(data_dir: Path = None):
                      raw_claim.get('confidence', 'high'),
                      raw_claim.get('location_in_paper', ''),
                      raw_claim.get('verbatim_quote', ''),
-                     'gpt-5.4', 'deep_v1',
+                     extraction_model, 'deep_v1',
                      result.get('collected_at', datetime.now().isoformat()),
                      json.dumps(view_paths), json.dumps(claim_data))
                 )

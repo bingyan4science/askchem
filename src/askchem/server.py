@@ -1816,7 +1816,11 @@ def api_quality():
             limitations.append("Contradiction detection pipeline deployed; batch scan pending")
     except Exception:
         limitations.append("Contradiction detection pipeline deployed; batch scan pending")
-    limitations.append("Abstract-only extractions capture headline findings; full-paper extractions from Gemini-3.1-pro-preview and GPT-5.4 include tables, conditions, and mechanistic detail")
+    limitations.append(
+        "Abstract-only extractions capture headline findings; full-paper PDF "
+        "claims were extracted with Gemini 3.1 Pro and include tables, "
+        "conditions, and mechanistic detail"
+    )
 
     quality = {
         "total_claims": total_claims,
@@ -1831,8 +1835,9 @@ def api_quality():
         "ltree_feedback": db.get_ltree_feedback_summary(),
         "smiles_validation": smiles_stats,
         "extraction_models": [
-            "gemini-3.1-pro (full paper PDF extraction + classification)",
-            "gpt-5-mini (abstract extraction)",
+            "gemini-3.1-pro (full-paper PDF extraction)",
+            "gemini-3.1-pro-preview (abstract extraction and classification)",
+            "gpt-5-mini (legacy abstract extraction and classification)",
         ],
         "citation_source": stats.get("citation_source", "Semantic Scholar Academic Graph API"),
         "citation_source_url": stats.get("citation_source_url", "https://api.semanticscholar.org/"),

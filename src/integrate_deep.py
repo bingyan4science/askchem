@@ -847,7 +847,7 @@ def cmd_build(args):
         ('total_nodes', str(total_nodes)),
         ('total_views', str(view_count)),
         ('version', '2.1.0'),
-        ('extraction_model', 'gpt-5.4 + gemini-3.1-pro'),
+        ('extraction_model', 'gemini-3.1-pro'),
         ('classification_model', 'gemini-3.1-pro + gpt-5-mini'),
         ('built_at', datetime.now().isoformat()),
     ]:
