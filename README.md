@@ -2,14 +2,14 @@
 
 **A claim-centered index for cross-paper chemistry search.**
 
-AskChem changes the unit of retrieval from the *paper* to the **provenance-carrying claim**: each paper is segmented into atomic, typed claims, each grounded by a verbatim source quote and a DOI. Over this shared claim store, AskChem exposes complementary structures for search and synthesis, so scientists and AI agents can retrieve specific findings, inspect their evidence, and assemble cross-paper answers without first reading and filtering whole documents.
+AskChem changes the unit of retrieval from the *paper* to the **source-grounded claim**: each paper is segmented into atomic, typed claims, each grounded by a verbatim source quote and a DOI. Over this shared claim store, AskChem exposes complementary structures for search and synthesis, so scientists and AI agents can retrieve specific findings, inspect their evidence, and assemble cross-paper answers without first reading and filtering whole documents.
 
 **Live at [askchem.org](https://askchem.org)** · **Dataset on [HuggingFace](https://huggingface.co/datasets/bing-yan/askchem)**
 
 ## What's Inside
 
 - **2.44M provenance-carrying claims** from **146.6K papers** (1925–2026) — each is a typed assertion with a verbatim quote and source DOI.
-- **Gemini full-paper extraction** — deep claims from PDFs were extracted with Gemini 3.1 Pro. Abstract-only records include Gemini extraction and a legacy GPT-5-mini abstract pipeline; `extraction_model` and `extraction_version` identify the provenance of each claim.
+- **Gemini full-paper extraction** — claims from full PDFs and abstracts were extracted with Gemini 3.1 Pro. `extraction_model` and `extraction_version` identify the provenance of each claim.
 - **Three complementary structures over one shared claim store:**
   - **Stabilized faceted taxonomy** — normalized L1/L2/L3 paths for reaction type, substance, application, technique, mechanism, extracted data, and claim type, complemented by temporal, author, and evidence-network navigation.
   - **Evidence graph** — ~171K typed claim-to-claim relations (`supports`, `contradicts`, `extends`, `derives_from`, `cites_as_evidence`); 97.9% edge-type precision on an expert audit.
